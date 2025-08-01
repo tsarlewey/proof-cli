@@ -1,0 +1,3 @@
+# Default configuration for proof-cli
+api_endpoint: https://api.proof.com
+timeout: 25
