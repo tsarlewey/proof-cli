@@ -391,12 +391,6 @@ go mod download
 go build -o proof
 ```
 
-### Running Tests
-
-```bash
-go test ./...
-```
-
 ### Code Formatting
 
 ```bash
@@ -410,4 +404,3 @@ For issues and feature requests, please visit the [GitHub repository](https://gi
 
 ## License
 
-[License information would go here]
