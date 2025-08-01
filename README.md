@@ -1,6 +1,8 @@
 # Proof CLI
 
-A command-line interface for interacting with the Proof API. The Proof CLI provides access to Business, Real Estate, and SCIM APIs through a unified interface.
+An unofficial command-line interface for interacting with the Proof API. The Proof CLI provides access to Business, Real Estate, and SCIM APIs through a unified interface.
+
+# This is an alpha product and should be treated as such. It is not an official product from Proof.
 
 ## Installation
 
