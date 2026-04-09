@@ -1,13 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/internal/business"
-	"github.com/tsarlewey/proof-cli/internal/real_estate"
-	"github.com/tsarlewey/proof-cli/internal/scim"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
 )
 
 // exampleCmd represents the example command group
@@ -27,21 +28,24 @@ var exampleListBusinessTransactionsCmd = &cobra.Command{
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Build query parameters
-		params := &business.ListTransactionsParams{
-			Limit:              10,
-			DocumentURLVersion: business.DocumentURLVersion,
+		limit := 10
+		docUrlVersion := business.GetAllTransactionsParamsDocumentUrlVersionV2
+		params := &business.GetAllTransactionsParams{
+			Limit:              &limit,
+			DocumentUrlVersion: &docUrlVersion,
 		}
 
-		// Make API call using global client
+		// Make API call using SDK client
 		fmt.Println("Fetching business transactions...")
-		resp, err := business.GetAllTransactions(proofClient, params)
+		client := getBusinessClient()
+		resp, err := client.GetAllTransactionsWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error fetching transactions:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -54,23 +58,24 @@ This example creates a notary for demonstration purposes.`,
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create the request body
-		requestBody := map[string]string{
-			"email":         "notary@example.com",
-			"first_name":    "Jane",
-			"last_name":     "Smith",
-			"us_state_abbr": "CA",
+		body := business.CreateNotaryJSONRequestBody{
+			Email:       "notary@example.com",
+			FirstName:   "Jane",
+			LastName:    "Smith",
+			UsStateAbbr: "CA",
 		}
 
-		// Make API call using global client
+		// Make API call using SDK client
 		fmt.Println("Creating notary...")
-		body, err := proofClient.Post("/v1/notaries/", requestBody)
+		client := getBusinessClient()
+		resp, err := client.CreateNotaryWithResponse(context.Background(), body)
 		if err != nil {
 			fmt.Println("Error creating notary:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -84,21 +89,24 @@ var exampleListRealEstateTransactionsCmd = &cobra.Command{
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Build query parameters
-		params := &real_estate.ListTransactionsParams{
-			Limit:  5,
-			Offset: 0,
+		limit := 5
+		offset := 0
+		params := &realestate.GetAllMortgageTransactionsParams{
+			Limit:  &limit,
+			Offset: &offset,
 		}
 
-		// Make API call using global client
+		// Make API call using SDK client
 		fmt.Println("Fetching real estate transactions...")
-		resp, err := real_estate.ListTransactions(proofClient, params)
+		client := getRealEstateClient()
+		resp, err := client.GetAllMortgageTransactionsWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error fetching real estate transactions:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -109,25 +117,32 @@ var exampleVerifyAddressCmd = &cobra.Command{
 	Long:   `Example command that demonstrates how to verify an address and get recording jurisdiction info.`,
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
-		request := &real_estate.VerifyAddressRequest{
-			StreetAddress: &real_estate.Address{
-				Line1:      "123 Main St",
-				City:       "San Francisco",
-				State:      "CA",
-				PostalCode: "94102",
-			},
+		// Build params for recording locations
+		txnType := realestate.GetRecordingLocationsParamsTransactionTypeRefinance
+		line1 := "123 Main St"
+		city := "San Francisco"
+		state := "CA"
+		postal := "94102"
+
+		params := &realestate.GetRecordingLocationsParams{
+			TransactionType:     txnType,
+			StreetAddressLine1:  &line1,
+			StreetAddressCity:   &city,
+			StreetAddressState:  &state,
+			StreetAddressPostal: &postal,
 		}
 
-		// Make API call using global client
+		// Make API call using SDK client
 		fmt.Println("Verifying address...")
-		resp, err := real_estate.VerifyAddress(proofClient, request)
+		client := getRealEstateClient()
+		resp, err := client.GetRecordingLocationsWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error verifying address:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -144,21 +159,24 @@ var exampleListSCIMUsersCmd = &cobra.Command{
 		organizationID := args[0]
 
 		// Build query parameters
-		params := &scim.ListUsersParams{
-			StartIndex: 1,
-			Count:      10,
+		startIndex := int32(1)
+		count := int32(10)
+		params := &scim.RetrieveResourceTypesCopyParams{
+			StartIndex: &startIndex,
+			Count:      &count,
 		}
 
-		// Make API call using global client
+		// Make API call using SDK client
 		fmt.Printf("Fetching SCIM users for organization %s...\n", organizationID)
-		resp, err := scim.ListUsers(proofClient, organizationID, params)
+		client := getSCIMClient()
+		resp, err := client.RetrieveResourceTypesCopyWithResponse(context.Background(), organizationID, params)
 		if err != nil {
 			fmt.Println("Error listing users:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -172,16 +190,17 @@ var exampleGetSCIMSchemaCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		organizationID := args[0]
 
-		// Make API call using global client
+		// Make API call using SDK client
 		fmt.Printf("Fetching SCIM user schema for organization %s...\n", organizationID)
-		resp, err := scim.GetUserSchema(proofClient, organizationID)
+		client := getSCIMClient()
+		resp, err := client.RetrieveUsersSchemaWithResponse(context.Background(), organizationID)
 		if err != nil {
 			fmt.Println("Error getting user schema:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 

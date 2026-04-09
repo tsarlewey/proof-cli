@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/internal/real_estate"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
 )
 
 // realEstateCmd represents the real-estate command
@@ -36,19 +38,29 @@ var reListTransactionsCmd = &cobra.Command{
 		status, _ := cmd.Flags().GetString("status")
 		organizationID, _ := cmd.Flags().GetString("organization-id")
 		loanNumber, _ := cmd.Flags().GetString("loan-number")
-		documentURLVersion, _ := cmd.Flags().GetString("document-url-version")
 		createdDateStart, _ := cmd.Flags().GetString("created-date-start")
 		createdDateEnd, _ := cmd.Flags().GetString("created-date-end")
 		lastUpdatedDateStart, _ := cmd.Flags().GetString("last-updated-date-start")
 		lastUpdatedDateEnd, _ := cmd.Flags().GetString("last-updated-date-end")
 
-		params := &real_estate.ListTransactionsParams{
-			Limit:              limit,
-			Offset:             offset,
-			TransactionStatus:  status,
-			OrganizationID:     organizationID,
-			LoanNumber:         loanNumber,
-			DocumentURLVersion: documentURLVersion,
+		params := &realestate.GetAllMortgageTransactionsParams{
+			DocumentUrlVersion: ptr(realestate.GetAllMortgageTransactionsParamsDocumentUrlVersionV2),
+		}
+
+		if limit > 0 {
+			params.Limit = ptr(limit)
+		}
+		if offset > 0 {
+			params.Offset = ptr(offset)
+		}
+		if status != "" {
+			params.TransactionStatus = ptr(realestate.GetAllMortgageTransactionsParamsTransactionStatus(status))
+		}
+		if organizationID != "" {
+			params.OrganizationId = ptr(organizationID)
+		}
+		if loanNumber != "" {
+			params.LoanNumber = ptr(loanNumber)
 		}
 
 		// Parse date filters if provided
@@ -88,15 +100,15 @@ var reListTransactionsCmd = &cobra.Command{
 			params.LastUpdatedDateEnd = &t
 		}
 
-		// Make API call using global client
-		resp, err := real_estate.ListTransactions(proofClient, params)
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.GetAllMortgageTransactionsWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error listing transactions:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -109,15 +121,19 @@ var reGetTransactionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
-		// Make API call using global client
-		resp, err := real_estate.GetTransaction(proofClient, transactionID)
+		params := &realestate.GetMortgageTransactionParams{
+			DocumentUrlVersion: ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
+		}
+
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.GetMortgageTransactionWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error getting transaction:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -133,22 +149,31 @@ var reCreateTransactionCmd = &cobra.Command{
 		fileNumber, _ := cmd.Flags().GetString("file-number")
 		loanNumber, _ := cmd.Flags().GetString("loan-number")
 
-		request := &real_estate.CreateTransactionRequest{
-			TransactionType: transactionType,
-			Draft:           draft,
-			FileNumber:      fileNumber,
-			LoanNumber:      loanNumber,
+		queryParams := &realestate.CreateMortgageTransactionParams{
+			DocumentUrlVersion: ptr(realestate.CreateMortgageTransactionParamsDocumentUrlVersionV2),
 		}
 
-		// Make API call using global client
-		resp, err := real_estate.CreateTransaction(proofClient, request)
+		body := realestate.CreateMortgageTransactionJSONRequestBody{
+			Draft:      ptr(draft),
+			FileNumber: ptrIfNotEmpty(fileNumber),
+			LoanNumber: ptrIfNotEmpty(loanNumber),
+		}
+
+		// Set transaction type if provided
+		if transactionType != "" {
+			txnType := realestate.TransactionCreateParamsTransactionType(transactionType)
+			body.TransactionType = &txnType
+		}
+
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.CreateMortgageTransactionWithResponse(context.Background(), queryParams, body)
 		if err != nil {
 			fmt.Println("Error creating transaction:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -161,15 +186,19 @@ var rePlaceOrderCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
-		// Make API call using global client
-		resp, err := real_estate.PlaceOrder(proofClient, transactionID)
+		params := &realestate.PlaceOrderParams{
+			DocumentUrlVersion: ptr(realestate.PlaceOrderParamsDocumentUrlVersionV2),
+		}
+
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.PlaceOrderWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error placing order:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -181,56 +210,58 @@ var reDocumentsCmd = &cobra.Command{
 }
 
 var reListDocumentsCmd = &cobra.Command{
-	Use:    "list",
-	Short:  "List real estate documents",
-	Long:   `List real estate documents with optional filtering`,
+	Use:    "list <transaction-id>",
+	Short:  "List real estate documents for a transaction",
+	Long:   `List real estate documents for a specific transaction`,
+	Args:   cobra.ExactArgs(1),
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Get command line flags
-		limit, _ := cmd.Flags().GetInt("limit")
-		offset, _ := cmd.Flags().GetInt("offset")
-		transactionID, _ := cmd.Flags().GetString("transaction-id")
-		documentType, _ := cmd.Flags().GetString("type")
-		status, _ := cmd.Flags().GetString("status")
+		transactionID := args[0]
 
-		params := &real_estate.ListDocumentsParams{
-			Limit:         limit,
-			Offset:        offset,
-			TransactionID: transactionID,
-			DocumentType:  documentType,
-			Status:        status,
+		params := &realestate.GetMortgageTransactionParams{
+			DocumentUrlVersion: ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
 		}
 
-		// Make API call using global client
-		resp, err := real_estate.ListDocuments(proofClient, params)
+		// Get transaction which includes documents
+		client := getRealEstateClient()
+		resp, err := client.GetMortgageTransactionWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error listing documents:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
 var reGetDocumentCmd = &cobra.Command{
-	Use:    "get <document-id>",
+	Use:    "get <transaction-id> <document-id>",
 	Short:  "Get a real estate document",
 	Long:   `Get details of a specific real estate document`,
-	Args:   cobra.ExactArgs(1),
+	Args:   cobra.ExactArgs(2),
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
-		documentID := args[0]
+		transactionID := args[0]
+		documentID := args[1]
 
-		// Make API call using global client
-		resp, err := real_estate.GetDocument(proofClient, documentID)
+		encoding, _ := cmd.Flags().GetString("encoding")
+
+		params := &realestate.GetMortgageDocumentParams{
+			DocumentUrlVersion: ptr(realestate.GetMortgageDocumentParamsDocumentUrlVersionV2),
+		}
+		if encoding != "" {
+			params.Encoding = ptr(realestate.GetMortgageDocumentParamsEncoding(encoding))
+		}
+
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.GetMortgageDocumentWithResponse(context.Background(), transactionID, documentID, params)
 		if err != nil {
 			fmt.Println("Error getting document:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -245,23 +276,36 @@ var reUploadDocumentCmd = &cobra.Command{
 		filePath := args[1]
 
 		// Get optional flags
-		documentType, _ := cmd.Flags().GetString("type")
-		externalID, _ := cmd.Flags().GetString("external-id")
+		filename, _ := cmd.Flags().GetString("filename")
 
-		request := &real_estate.AddDocumentRequest{
-			DocumentType: documentType,
-			ExternalID:   externalID,
+		// Read the file
+		fileContent, err := os.ReadFile(filePath)
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			os.Exit(1)
 		}
 
-		// Make API call using global client
-		resp, err := real_estate.AddDocument(proofClient, transactionID, filePath, request)
+		// Encode document to base64
+		documentBase64 := base64.StdEncoding.EncodeToString(fileContent)
+
+		queryParams := &realestate.AddMortgageDocumentParams{
+			DocumentUrlVersion: ptr(realestate.AddMortgageDocumentParamsDocumentUrlVersionV2),
+		}
+
+		body := realestate.AddMortgageDocumentJSONRequestBody{
+			Resource: ptr(documentBase64),
+			Filename: ptrIfNotEmpty(filename),
+		}
+
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.AddMortgageDocumentWithResponse(context.Background(), transactionID, queryParams, body)
 		if err != nil {
 			fmt.Println("Error uploading document:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -278,24 +322,15 @@ var reListWebhooksCmd = &cobra.Command{
 	Long:   `List real estate webhooks`,
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Get command line flags
-		limit, _ := cmd.Flags().GetInt("limit")
-		offset, _ := cmd.Flags().GetInt("offset")
-
-		params := &real_estate.ListWebhooksParams{
-			Limit:  limit,
-			Offset: offset,
-		}
-
-		// Make API call using global client
-		resp, err := real_estate.ListWebhooks(proofClient, params)
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.GetAllMortgageWebhooksV2WithResponse(context.Background())
 		if err != nil {
 			fmt.Println("Error listing webhooks:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -310,24 +345,24 @@ var reCreateWebhookCmd = &cobra.Command{
 		header, _ := cmd.Flags().GetString("header")
 		subscriptions, _ := cmd.Flags().GetStringSlice("subscriptions")
 
-		request := &real_estate.CreateWebhookRequest{
-			URL:           url,
+		body := realestate.CreateMortgageWebhookV2JSONRequestBody{
+			Url:           url,
 			Subscriptions: subscriptions,
 		}
 
 		if header != "" {
-			request.Header = &header
+			body.Header = ptr(header)
 		}
 
-		// Make API call using global client
-		resp, err := real_estate.CreateWebhook(proofClient, request)
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.CreateMortgageWebhookV2WithResponse(context.Background(), body)
 		if err != nil {
 			fmt.Println("Error creating webhook:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -343,30 +378,38 @@ var reVerifyAddressCmd = &cobra.Command{
 		city, _ := cmd.Flags().GetString("city")
 		state, _ := cmd.Flags().GetString("state")
 		postalCode, _ := cmd.Flags().GetString("postal-code")
+		transactionType, _ := cmd.Flags().GetString("transaction-type")
 
 		if line1 == "" || city == "" || state == "" {
 			fmt.Println("Error: line1, city, and state are required")
 			os.Exit(1)
 		}
 
-		request := &real_estate.VerifyAddressRequest{
-			StreetAddress: &real_estate.Address{
-				Line1:      line1,
-				City:       city,
-				State:      state,
-				PostalCode: postalCode,
-			},
+		// Transaction type is required for the API
+		txnType := realestate.GetRecordingLocationsParamsTransactionType("purchase_buyer_loan")
+		if transactionType != "" {
+			txnType = realestate.GetRecordingLocationsParamsTransactionType(transactionType)
 		}
 
-		// Make API call using global client
-		resp, err := real_estate.VerifyAddress(proofClient, request)
+		params := &realestate.GetRecordingLocationsParams{
+			TransactionType:    txnType,
+			StreetAddressLine1: ptr(line1),
+			StreetAddressCity:  ptr(city),
+			StreetAddressState: ptr(state),
+		}
+		if postalCode != "" {
+			params.StreetAddressPostal = ptr(postalCode)
+		}
+
+		// Make API call using SDK
+		client := getRealEstateClient()
+		resp, err := client.GetRecordingLocationsWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error verifying address:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -404,7 +447,7 @@ func init() {
 	reListTransactionsCmd.Flags().String("created-date-end", "", "ISO-8601 DateTime - transactions created before this time")
 	reListTransactionsCmd.Flags().String("last-updated-date-start", "", "ISO-8601 DateTime - transactions updated after this time")
 	reListTransactionsCmd.Flags().String("last-updated-date-end", "", "ISO-8601 DateTime - transactions updated before this time")
-	reListTransactionsCmd.Flags().String("document-url-version", "v1", "Document URL version (v1 or v2)")
+	reListTransactionsCmd.Flags().String("document-url-version", "v2", "Document URL version (v1 or v2)")
 
 	reCreateTransactionCmd.Flags().String("type", "purchase", "Transaction type")
 	reCreateTransactionCmd.Flags().Bool("draft", true, "Create as draft")
@@ -412,14 +455,9 @@ func init() {
 	reCreateTransactionCmd.Flags().String("loan-number", "", "Loan number")
 
 	// Add flags for documents
-	reListDocumentsCmd.Flags().Int("limit", 0, "Limit number of results")
-	reListDocumentsCmd.Flags().Int("offset", 0, "Offset for pagination")
-	reListDocumentsCmd.Flags().String("transaction-id", "", "Filter by transaction ID")
-	reListDocumentsCmd.Flags().String("type", "", "Filter by document type")
-	reListDocumentsCmd.Flags().String("status", "", "Filter by document status")
+	reGetDocumentCmd.Flags().String("encoding", "", "Encoding format (base64 or uri)")
 
-	reUploadDocumentCmd.Flags().String("type", "", "Document type")
-	reUploadDocumentCmd.Flags().String("external-id", "", "External ID for the document")
+	reUploadDocumentCmd.Flags().String("filename", "", "Document filename")
 
 	// Add flags for webhooks
 	reListWebhooksCmd.Flags().Int("limit", 0, "Limit number of results")
@@ -433,6 +471,7 @@ func init() {
 	reVerifyAddressCmd.Flags().String("city", "", "City (required)")
 	reVerifyAddressCmd.Flags().String("state", "", "State abbreviation (required)")
 	reVerifyAddressCmd.Flags().String("postal-code", "", "Postal/ZIP code")
+	reVerifyAddressCmd.Flags().String("transaction-type", "purchase_buyer_loan", "Transaction type for eligibility check")
 	reVerifyAddressCmd.MarkFlagRequired("line1")
 	reVerifyAddressCmd.MarkFlagRequired("city")
 	reVerifyAddressCmd.MarkFlagRequired("state")

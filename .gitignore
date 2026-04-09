@@ -35,3 +35,9 @@ ehthumbs.db
 Thumbs.db
 
 *direnv
+
+# Downloaded OpenAPI specs
+openapi/
+
+# Generated SDK files
+pkg/sdk/*/client.gen.go

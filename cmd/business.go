@@ -1,15 +1,28 @@
 package cmd
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/internal/business"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
 )
+
+// ptr returns a pointer to the given value (helper for optional SDK fields)
+func ptr[T any](v T) *T {
+	return &v
+}
+
+// ptrIfNotEmpty returns a pointer to the string if non-empty, otherwise nil
+func ptrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
 
 // businessCmd represents the business command
 var businessCmd = &cobra.Command{
@@ -42,11 +55,15 @@ var bizListTransactionsCmd = &cobra.Command{
 		dateEnd, _ := cmd.Flags().GetString("created-end")
 
 		// Build query parameters
-		params := &business.ListTransactionsParams{
-			Limit:              limit,
-			Offset:             offset,
-			TransactionStatus:  status,
-			DocumentURLVersion: business.DocumentURLVersion,
+		params := &business.GetAllTransactionsParams{
+			Limit:              ptr(limit),
+			Offset:             ptr(offset),
+			DocumentUrlVersion: ptr(business.GetAllTransactionsParamsDocumentUrlVersionV2),
+		}
+
+		// Parse status if provided
+		if status != "" {
+			params.TransactionStatus = ptr(business.GetAllTransactionsParamsTransactionStatus(status))
 		}
 
 		// Parse date filters if provided
@@ -68,15 +85,15 @@ var bizListTransactionsCmd = &cobra.Command{
 			params.CreatedDateEnd = &t
 		}
 
-		// Make API call using global client
-		resp, err := business.GetAllTransactions(proofClient, params)
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.GetAllTransactionsWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error fetching transactions:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -90,15 +107,19 @@ var bizGetTransactionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
-		// Make API call using global client
-		resp, err := business.GetTransaction(proofClient, transactionID)
+		params := &business.GetTransactionParams{
+			DocumentUrlVersion: ptr(business.GetTransactionParamsDocumentUrlVersionV2),
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.GetTransactionWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error fetching transaction:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -133,30 +154,33 @@ var bizCreateTransactionCmd = &cobra.Command{
 		// Encode document to base64
 		documentBase64 := base64.StdEncoding.EncodeToString(documentData)
 
-		// Build transaction parameters
-		params := &business.CreateTransactionParams{
-			TransactionName: transactionName,
-			TransactionType: transactionType,
-			Draft:           draft,
-			Documents:       []string{documentBase64},
-			Signers: []business.Signer{
-				{
-					Email:     email,
-					FirstName: firstName,
-					LastName:  lastName,
-				},
-			},
+		// Build query parameters
+		queryParams := &business.CreateTransactionParams{
+			DocumentUrlVersion: ptr(business.CreateTransactionParamsDocumentUrlVersionV2),
 		}
 
-		// Make API call using global client
-		resp, err := business.CreateTransaction(proofClient, params)
+		// Build request body
+		body := business.CreateTransactionJSONRequestBody{
+			Signer: business.Signer{
+				Email:     email,
+				FirstName: ptrIfNotEmpty(firstName),
+				LastName:  ptrIfNotEmpty(lastName),
+			},
+			Documents:       ptr([]string{documentBase64}),
+			Draft:           ptr(draft),
+			TransactionName: ptrIfNotEmpty(transactionName),
+			TransactionType: ptrIfNotEmpty(transactionType),
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.CreateTransactionWithResponse(context.Background(), queryParams, body)
 		if err != nil {
 			fmt.Println("Error creating transaction:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -169,17 +193,18 @@ var bizDeleteTransactionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
-		// Make API call using global client
-		resp, err := business.DeleteTransaction(proofClient, transactionID)
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.DeleteTransactionWithResponse(context.Background(), transactionID)
 		if err != nil {
 			fmt.Println("Error deleting transaction:", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("Transaction deleted successfully")
-
-		// Show response details if verbose
-		PrintVerbose(string(resp))
+		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+			fmt.Println("Transaction deleted successfully")
+		}
+		PrintVerbose(string(resp.Body))
 	},
 }
 
@@ -192,15 +217,19 @@ var bizActivateTransactionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
-		// Make API call using global client
-		resp, err := business.ActivateDraftTransaction(proofClient, transactionID)
+		params := &business.ActivateDraftTransactionParams{
+			DocumentUrlVersion: ptr(business.ActivateDraftTransactionParamsDocumentUrlVersionV2),
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.ActivateDraftTransactionWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error activating transaction:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -214,15 +243,22 @@ var bizRecallTransactionCmd = &cobra.Command{
 		transactionID := args[0]
 		recallReason, _ := cmd.Flags().GetString("reason")
 
-		// Make API call using global client
-		resp, err := business.RecallTransaction(proofClient, transactionID, recallReason)
+		params := &business.RecallTransactionParams{
+			DocumentUrlVersion: ptr(business.RecallTransactionParamsDocumentUrlVersionV2),
+		}
+		if recallReason != "" {
+			params.RecallReason = ptr(recallReason)
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.RecallTransactionWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error recalling transaction:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -236,15 +272,22 @@ var bizResendEmailCmd = &cobra.Command{
 		transactionID := args[0]
 		messageToSigner, _ := cmd.Flags().GetString("message")
 
-		// Make API call using global client
-		resp, err := business.ResendTransactionEmail(proofClient, transactionID, messageToSigner)
+		params := &business.ResendTransactionEmailParams{
+			DocumentUrlVersion: ptr(business.ResendTransactionEmailParamsDocumentUrlVersionV2),
+		}
+		if messageToSigner != "" {
+			params.MessageToSigner = ptr(messageToSigner)
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.ResendTransactionEmailWithResponse(context.Background(), transactionID, params)
 		if err != nil {
 			fmt.Println("Error resending email:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -258,15 +301,22 @@ var bizResendSMSCmd = &cobra.Command{
 		transactionID := args[0]
 		phoneNumber, _ := cmd.Flags().GetString("phone-number")
 
-		// Make API call using global client
-		resp, err := business.ResendTransactionSMS(proofClient, transactionID, phoneNumber)
+		params := &business.ResendTransactionSMSParams{
+			DocumentUrlVersion: ptr(business.ResendTransactionSMSParamsDocumentUrlVersionV2),
+		}
+		if phoneNumber != "" {
+			params.PhoneNumber = ptr(phoneNumber)
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.ResendTransactionSMSWithResponse(context.Background(), transactionID, params, business.ResendTransactionSMSJSONRequestBody{})
 		if err != nil {
 			fmt.Println("Error resending SMS:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -279,15 +329,15 @@ var bizGetEligibleNotariesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
-		// Make API call using global client
-		resp, err := business.GetAllEligibleNotaries(proofClient, transactionID)
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.GetAllEligibleNotariesWithResponse(context.Background(), transactionID)
 		if err != nil {
 			fmt.Println("Error getting eligible notaries:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -335,34 +385,42 @@ var bizAddDocumentCmd = &cobra.Command{
 		// Encode document to base64
 		documentBase64 := base64.StdEncoding.EncodeToString(fileContent)
 
-		// Build document parametersI
-		params := &business.AddDocumentParams{
-			Resource:                     documentBase64,
-			Filename:                     filename,
-			Requirement:                  requirement,
-			NotarizationRequired:         notarizationRequired,
-			WitnessRequired:              witnessRequired,
-			BundlePosition:               bundlePosition,
-			EsignRequired:                esignRequired,
-			IdentityConfirmationRequired: identityConfirmationRequired,
-			SigningRequiresMeeting:       signingRequiresMeeting,
-			Vaulted:                      vaulted,
-			AuthorizationHeader:          authorizationHeader,
-			CustomerCanAnnotate:          customerCanAnnotate,
-			PDFBookmarked:                pdfBookmarked,
-			TrackingID:                   trackingID,
-			TextTagSyntax:                textTagSyntax,
+		// Build query parameters
+		queryParams := &business.AddDocumentParams{
+			DocumentUrlVersion: ptr(business.AddDocumentParamsDocumentUrlVersionV2),
 		}
 
-		// Make API call using global client
-		resp, err := business.AddDocument(proofClient, transactionID, params)
+		// Build request body
+		body := business.AddDocumentJSONRequestBody{
+			Resource:                     ptr(documentBase64),
+			Filename:                     ptrIfNotEmpty(filename),
+			NotarizationRequired:         ptr(notarizationRequired),
+			WitnessRequired:              ptr(witnessRequired),
+			EsignRequired:                ptr(esignRequired),
+			IdentityConfirmationRequired: ptr(identityConfirmationRequired),
+			SigningRequiresMeeting:       ptr(signingRequiresMeeting),
+			Vaulted:                      ptr(vaulted),
+			CustomerCanAnnotate:          ptr(customerCanAnnotate),
+			PdfBookmarked:                ptr(pdfBookmarked),
+			TrackingId:                   ptrIfNotEmpty(trackingID),
+			TextTagSyntax:                ptrIfNotEmpty(textTagSyntax),
+			Requirement:                  ptrIfNotEmpty(requirement),
+			AuthorizationHeader:          ptrIfNotEmpty(authorizationHeader),
+		}
+
+		if bundlePosition > 0 {
+			body.BundlePosition = ptr(bundlePosition)
+		}
+
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.AddDocumentWithResponse(context.Background(), transactionID, queryParams, body)
 		if err != nil {
 			fmt.Println("Error adding document:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -376,23 +434,24 @@ var bizGetDocumentCmd = &cobra.Command{
 		transactionID := args[0]
 		documentID := args[1]
 
-		// Get flag values
 		encoding, _ := cmd.Flags().GetString("encoding")
 
-		// Build query parameters
 		params := &business.GetDocumentParams{
-			Encoding: encoding,
+			DocumentUrlVersion: ptr(business.GetDocumentParamsDocumentUrlVersionV2),
+		}
+		if encoding != "" {
+			params.Encoding = ptr(encoding)
 		}
 
-		// Make API call using global client
-		resp, err := business.GetDocument(proofClient, transactionID, documentID, params)
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.GetDocumentWithResponse(context.Background(), transactionID, documentID, params)
 		if err != nil {
 			fmt.Println("Error fetching document:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -405,17 +464,18 @@ var bizDeleteDocumentCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		documentID := args[0]
 
-		// Make API call using global client
-		resp, err := business.DeleteDocument(proofClient, documentID)
+		// Make API call using SDK
+		client := getBusinessClient()
+		resp, err := client.DeleteDocumentWithResponse(context.Background(), documentID)
 		if err != nil {
 			fmt.Println("Error deleting document:", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("Document deleted successfully")
-
-		// Show response details if verbose
-		PrintVerbose(string(resp))
+		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+			fmt.Println("Document deleted successfully")
+		}
+		PrintVerbose(string(resp.Body))
 	},
 }
 
@@ -435,13 +495,14 @@ var bizGetWebhookCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		PrintVerbose("Fetching webhook configuration")
 
-		body, err := proofClient.Get("/v1/webhooks")
+		client := getBusinessClient()
+		resp, err := client.GetWebhookURLWithResponse(context.Background())
 		if err != nil {
 			fmt.Println("Error getting webhook:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -453,13 +514,14 @@ var bizListWebhooksCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		PrintVerbose("Fetching webhooks v2 list")
 
-		body, err := proofClient.Get("/v2/webhooks")
+		client := getBusinessClient()
+		resp, err := client.GetAllWebhooksV2WithResponse(context.Background())
 		if err != nil {
 			fmt.Println("Error listing webhooks:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -472,16 +534,16 @@ var bizGetWebhookV2Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		webhookID := args[0]
 
-		path := "/v2/webhooks/" + webhookID
-		PrintVerbose("Fetching webhook v2 from: " + path)
+		PrintVerbose("Fetching webhook v2: " + webhookID)
 
-		body, err := proofClient.Get(path)
+		client := getBusinessClient()
+		resp, err := client.GetWebhookV2WithResponse(context.Background(), webhookID)
 		if err != nil {
 			fmt.Println("Error getting webhook v2:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -492,29 +554,32 @@ var bizCreateWebhookCmd = &cobra.Command{
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		url, _ := cmd.Flags().GetString("url")
-		name, _ := cmd.Flags().GetString("name")
 		events, _ := cmd.Flags().GetStringSlice("events")
+		header, _ := cmd.Flags().GetString("header")
 
-		if url == "" || name == "" {
-			fmt.Println("Error: url and name are required")
+		if url == "" {
+			fmt.Println("Error: url is required")
 			os.Exit(1)
 		}
 
-		requestBody := map[string]any{
-			"url":    url,
-			"name":   name,
-			"events": events,
+		body := business.CreateWebhookV2JSONRequestBody{
+			Url:           url,
+			Subscriptions: events,
+		}
+		if header != "" {
+			body.Header = ptr(header)
 		}
 
 		PrintVerbose("Creating webhook v2 with URL: " + url)
 
-		body, err := proofClient.Post("/v2/webhooks", requestBody)
+		client := getBusinessClient()
+		resp, err := client.CreateWebhookV2WithResponse(context.Background(), body)
 		if err != nil {
 			fmt.Println("Error creating webhook v2:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -527,35 +592,29 @@ var bizUpdateWebhookCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		webhookID := args[0]
 		url, _ := cmd.Flags().GetString("url")
-		name, _ := cmd.Flags().GetString("name")
 		events, _ := cmd.Flags().GetStringSlice("events")
+		header, _ := cmd.Flags().GetString("header")
 
-		requestBody := make(map[string]any)
-		if url != "" {
-			requestBody["url"] = url
+		// For updates, we need to provide the full body
+		// URL and Subscriptions are required fields
+		body := business.UpdateWebhookV2JSONRequestBody{
+			Url:           url,
+			Subscriptions: events,
 		}
-		if name != "" {
-			requestBody["name"] = name
-		}
-		if len(events) > 0 {
-			requestBody["events"] = events
-		}
-
-		if len(requestBody) == 0 {
-			fmt.Println("Error: at least one field to update is required")
-			os.Exit(1)
+		if header != "" {
+			body.Header = ptr(header)
 		}
 
-		path := "/v2/webhooks/" + webhookID
-		PrintVerbose("Updating webhook v2: " + path)
+		PrintVerbose("Updating webhook v2: " + webhookID)
 
-		body, err := proofClient.Put(path, requestBody)
+		client := getBusinessClient()
+		resp, err := client.UpdateWebhookV2WithResponse(context.Background(), webhookID, body)
 		if err != nil {
 			fmt.Println("Error updating webhook v2:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -568,16 +627,18 @@ var bizDeleteWebhookCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		webhookID := args[0]
 
-		path := "/v2/webhooks/" + webhookID
-		PrintVerbose("Deleting webhook v2: " + path)
+		PrintVerbose("Deleting webhook v2: " + webhookID)
 
-		_, err := proofClient.Delete(path)
+		client := getBusinessClient()
+		resp, err := client.DeleteWebhookV2WithResponse(context.Background(), webhookID)
 		if err != nil {
 			fmt.Println("Error deleting webhook v2:", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("Webhook v2 deleted successfully")
+		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+			fmt.Println("Webhook v2 deleted successfully")
+		}
 	},
 }
 
@@ -590,16 +651,16 @@ var bizGetWebhookEventsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		webhookID := args[0]
 
-		path := "/v2/webhooks/" + webhookID + "/events"
-		PrintVerbose("Fetching webhook v2 events from: " + path)
+		PrintVerbose("Fetching webhook v2 events: " + webhookID)
 
-		body, err := proofClient.Get(path)
+		client := getBusinessClient()
+		resp, err := client.GetWebhookEventsV2WithResponse(context.Background(), webhookID, nil)
 		if err != nil {
 			fmt.Println("Error getting webhook v2 events:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -611,13 +672,14 @@ var bizGetWebhookSubscriptionsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		PrintVerbose("Fetching webhook v2 subscriptions")
 
-		body, err := proofClient.Get("/v2/webhooks/subscriptions")
+		client := getBusinessClient()
+		resp, err := client.GetWebhookSubscriptionsV2WithResponse(context.Background())
 		if err != nil {
 			fmt.Println("Error getting webhook v2 subscriptions:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -637,29 +699,24 @@ var bizListNotariesCmd = &cobra.Command{
 		orgID, _ := cmd.Flags().GetString("org-id")
 		state, _ := cmd.Flags().GetString("state")
 
-		path := "/v1/notaries/"
-		if orgID != "" || state != "" {
-			path += "?"
-			if orgID != "" {
-				path += fmt.Sprintf("organization_id=%s", orgID)
-				if state != "" {
-					path += "&"
-				}
-			}
-			if state != "" {
-				path += fmt.Sprintf("us_state_abbr=%s", state)
-			}
+		params := &business.GetAllNotariesParams{}
+		if orgID != "" {
+			params.OrganizationId = ptr(orgID)
+		}
+		if state != "" {
+			params.UsStateAbbr = ptr(state)
 		}
 
-		PrintVerbose(fmt.Sprintf("Fetching notaries from: %s", path))
+		PrintVerbose("Fetching notaries")
 
-		body, err := proofClient.Get(path)
+		client := getBusinessClient()
+		resp, err := client.GetAllNotariesWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error listing notaries:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -672,16 +729,16 @@ var bizGetNotaryCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		notaryID := args[0]
 
-		path := fmt.Sprintf("/v1/notaries/%s", notaryID)
-		PrintVerbose(fmt.Sprintf("Fetching notary from: %s", path))
+		PrintVerbose("Fetching notary: " + notaryID)
 
-		body, err := proofClient.Get(path)
+		client := getBusinessClient()
+		resp, err := client.GetNotaryWithResponse(context.Background(), notaryID)
 		if err != nil {
 			fmt.Println("Error getting notary:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -702,27 +759,26 @@ var bizCreateNotaryCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Create the request body
-		requestBody := map[string]string{
-			"email":         email,
-			"first_name":    firstName,
-			"last_name":     lastName,
-			"us_state_abbr": state,
+		body := business.CreateNotaryJSONRequestBody{
+			Email:       email,
+			FirstName:   firstName,
+			LastName:    lastName,
+			UsStateAbbr: state,
 		}
-
 		if middleName != "" {
-			requestBody["middle_name"] = middleName
+			body.MiddleName = ptr(middleName)
 		}
 
 		PrintVerbose(fmt.Sprintf("Creating notary with email: %s", email))
 
-		body, err := proofClient.Post("/v1/notaries/", requestBody)
+		client := getBusinessClient()
+		resp, err := client.CreateNotaryWithResponse(context.Background(), body)
 		if err != nil {
 			fmt.Println("Error creating notary:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -735,16 +791,18 @@ var bizDeleteNotaryCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		notaryID := args[0]
 
-		path := fmt.Sprintf("/v1/notaries/%s", notaryID)
-		PrintVerbose(fmt.Sprintf("Deleting notary: %s", path))
+		PrintVerbose("Deleting notary: " + notaryID)
 
-		_, err := proofClient.Delete(path)
+		client := getBusinessClient()
+		resp, err := client.DeleteNotaryWithResponse(context.Background(), notaryID)
 		if err != nil {
 			fmt.Println("Error deleting notary:", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("Notary deleted successfully")
+		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+			fmt.Println("Notary deleted successfully")
+		}
 	},
 }
 
@@ -764,34 +822,24 @@ var bizListTemplatesCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
 
-		// Build query parameters
-		path := "/v1/templates"
-		var queryParams []string
-
+		params := &business.GetAllTemplatesParams{}
 		if limit > 0 {
-			queryParams = append(queryParams, "limit="+strconv.Itoa(limit))
+			params.Limit = ptr(limit)
 		}
 		if offset > 0 {
-			queryParams = append(queryParams, "offset="+strconv.Itoa(offset))
+			params.Offset = ptr(offset)
 		}
 
-		if len(queryParams) > 0 {
-			result := queryParams[0]
-			for i := 1; i < len(queryParams); i++ {
-				result += "&" + queryParams[i]
-			}
-			path += "?" + result
-		}
+		PrintVerbose("Fetching templates")
 
-		PrintVerbose(fmt.Sprintf("Fetching templates from: %s", path))
-
-		body, err := proofClient.Get(path)
+		client := getBusinessClient()
+		resp, err := client.GetAllTemplatesWithResponse(context.Background(), params)
 		if err != nil {
 			fmt.Println("Error listing templates:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -819,24 +867,22 @@ var bizCreateReferralCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Build referral parameters
-		params := &business.CreateReferralParams{
+		body := business.CreateReferralJSONRequestBody{
 			Name:           name,
-			CoverPayment:   coverPayment,
-			OrganizationID: organizationID,
-			RedirectURL:    redirectURL,
-			UseBranding:    useBranding,
+			CoverPayment:   ptr(coverPayment),
+			OrganizationId: ptrIfNotEmpty(organizationID),
+			RedirectUrl:    ptrIfNotEmpty(redirectURL),
+			UseBranding:    ptr(useBranding),
 		}
 
-		// Make API call using global client
-		resp, err := business.CreateReferral(proofClient, params)
+		client := getBusinessClient()
+		resp, err := client.CreateReferralWithResponse(context.Background(), body)
 		if err != nil {
 			fmt.Println("Error creating referral campaign:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -850,20 +896,19 @@ var bizGenerateReferralCodeCmd = &cobra.Command{
 		referralCampaignID := args[0]
 		expiresAt, _ := cmd.Flags().GetString("expires-at")
 
-		// Build parameters
-		params := &business.GenerateReferralCodeParams{
-			ExpiresAt: expiresAt,
+		body := business.GenerateReferralCodeJSONRequestBody{}
+		if expiresAt != "" {
+			body.ExpiresAt = ptr(expiresAt)
 		}
 
-		// Make API call using global client
-		resp, err := business.GenerateReferralCode(proofClient, referralCampaignID, params)
+		client := getBusinessClient()
+		resp, err := client.GenerateReferralCodeWithResponse(context.Background(), referralCampaignID, body)
 		if err != nil {
 			fmt.Println("Error generating referral code:", err)
 			os.Exit(1)
 		}
 
-		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -891,37 +936,43 @@ var bizCreateIntegrationCmd = &cobra.Command{
 		}
 
 		// Validate integration name
+		var integrationName business.IntegrationParamsName
 		switch name {
-		case "ADOBE", "DOCUTECH":
-			// Valid integration name
+		case "ADOBE":
+			integrationName = business.ADOBE
+		case "DOCUTECH":
+			integrationName = business.DOCUTECH
 		default:
 			fmt.Println("Error: name must be one of: ADOBE, DOCUTECH")
 			os.Exit(1)
 		}
 
-		// Create the request params
-		params := &business.CreateIntegrationParams{
-			Name:           name,
-			OrganizationID: orgID,
+		body := business.CreateIntegrationJSONRequestBody{
+			Name:           ptr(integrationName),
+			OrganizationId: ptr(orgID),
 		}
 
 		// Add configuration if provided
 		if accountID != "" || environment != "" {
-			params.Configuration = &business.IntegrationConfiguration{
-				AccountID:   accountID,
-				Environment: environment,
+			body.Configuration = &struct {
+				AccountId   *string `json:"account_id,omitempty"`
+				Environment *string `json:"environment,omitempty"`
+			}{
+				AccountId:   ptrIfNotEmpty(accountID),
+				Environment: ptrIfNotEmpty(environment),
 			}
 		}
 
 		PrintVerbose(fmt.Sprintf("Creating %s integration for organization %s", name, orgID))
 
-		body, err := business.CreateIntegration(proofClient, params)
+		client := getBusinessClient()
+		resp, err := client.CreateIntegrationWithResponse(context.Background(), body)
 		if err != nil {
 			fmt.Println("Error creating integration:", err)
 			os.Exit(1)
 		}
 
-		PrintResponse(body)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -1027,13 +1078,13 @@ func init() {
 
 	// Add flags for webhook commands
 	bizCreateWebhookCmd.Flags().String("url", "", "Webhook URL")
-	bizCreateWebhookCmd.Flags().String("name", "", "Webhook name")
-	bizCreateWebhookCmd.Flags().StringSlice("events", []string{}, "Event types to subscribe to")
+	bizCreateWebhookCmd.Flags().String("name", "", "Webhook name (deprecated, use subscriptions)")
+	bizCreateWebhookCmd.Flags().StringSlice("events", []string{}, "Event subscriptions to subscribe to")
 	bizCreateWebhookCmd.Flags().String("header", "", "Header value to pass through every request (e.g. X-Custom-Header:X-Custom-Key)")
 
 	bizUpdateWebhookCmd.Flags().String("url", "", "Webhook URL")
-	bizUpdateWebhookCmd.Flags().String("name", "", "Webhook name")
-	bizUpdateWebhookCmd.Flags().StringSlice("events", []string{}, "Event types to subscribe to")
+	bizUpdateWebhookCmd.Flags().String("name", "", "Webhook name (deprecated)")
+	bizUpdateWebhookCmd.Flags().StringSlice("events", []string{}, "Event subscriptions to subscribe to")
 	bizUpdateWebhookCmd.Flags().String("header", "", "Header value to pass through every request (e.g. X-Custom-Header:X-Custom-Key)")
 
 	// Add flags for notary commands

@@ -220,6 +220,32 @@ func (c *ProofClient) Delete(path string, opts ...*RequestOptions) ([]byte, erro
 	return c.Request("DELETE", path, nil, opts...)
 }
 
+// AddAuthHeaders adds authentication headers (OAuth Bearer token or API key) to an HTTP request.
+// This is useful for integrating with generated SDK clients that require a custom HTTP client.
+func (c *ProofClient) AddAuthHeaders(req *http.Request) error {
+	if c.config.OAuth != nil && c.config.OAuth.Enabled {
+		// Use OAuth authentication
+		token, err := c.getValidOAuthToken()
+		if err != nil {
+			return fmt.Errorf("failed to get OAuth token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	} else {
+		req.Header.Set("ApiKey", c.apiKey)
+	}
+	return nil
+}
+
+// HTTPClient returns the underlying HTTP client for use with generated SDK clients.
+func (c *ProofClient) HTTPClient() *http.Client {
+	return c.httpClient
+}
+
+// GetConfig returns the configuration for use with generated SDK clients.
+func (c *ProofClient) GetConfig() *Config {
+	return c.config
+}
+
 func HandleError(err error, message string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", message, err)

@@ -1,13 +1,15 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/internal/scim"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
 )
 
 // scimCmd represents the scim command
@@ -38,20 +40,26 @@ var scimListUsersCmd = &cobra.Command{
 		startIndex, _ := cmd.Flags().GetInt("start-index")
 		count, _ := cmd.Flags().GetInt("count")
 
-		params := &scim.ListUsersParams{
-			StartIndex: startIndex,
-			Count:      count,
+		params := &scim.RetrieveResourceTypesCopyParams{}
+		if startIndex > 0 {
+			si := int32(startIndex)
+			params.StartIndex = &si
+		}
+		if count > 0 {
+			c := int32(count)
+			params.Count = &c
 		}
 
-		// Make API call using global proofClient
-		resp, err := scim.ListUsers(proofClient, organizationID, params)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.RetrieveResourceTypesCopyWithResponse(context.Background(), organizationID, params)
 		if err != nil {
 			fmt.Println("Error listing users:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -65,15 +73,16 @@ var scimGetUserCmd = &cobra.Command{
 		organizationID := args[0]
 		userID := args[1]
 
-		// Make API call
-		resp, err := scim.GetUser(proofClient, organizationID, userID)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.CreateUserCopyWithResponse(context.Background(), organizationID, userID, nil)
 		if err != nil {
 			fmt.Println("Error getting user:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -100,53 +109,57 @@ var scimCreateUserCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		params := &scim.CreateUserParams{
+		body := scim.CreateUserJSONRequestBody{
 			UserName: userName,
-			Active:   active,
 		}
+
+		// Set active status
+		activeStr := "true"
+		if !active {
+			activeStr = "false"
+		}
+		body.Active = &activeStr
 
 		// Add name if provided
 		if givenName != "" || familyName != "" {
-			params.Name = &scim.UserName{
-				GivenName:  givenName,
-				FamilyName: familyName,
+			body.Name = &struct {
+				FamilyName *string `json:"familyName,omitempty"`
+				GivenName  *string `json:"givenName,omitempty"`
+			}{}
+			if givenName != "" {
+				body.Name.GivenName = &givenName
+			}
+			if familyName != "" {
+				body.Name.FamilyName = &familyName
 			}
 		}
 
 		// Add email if provided
 		if email != "" {
-			params.Emails = []scim.UserEmail{
-				{
-					Value:   email,
-					Primary: true,
-				},
-			}
+			emails := []string{email}
+			body.Emails = &emails
 		}
 
 		// Add roles if provided
 		if len(roles) > 0 {
-			for i, role := range roles {
-				params.Roles = append(params.Roles, scim.UserRole{
-					Value:   role,
-					Primary: i == 0, // First role is primary
-				})
-			}
+			body.Roles = &roles
 		}
 
 		// Add external ID if provided
 		if externalID != "" {
-			params.ExternalID = externalID
+			body.ExternalId = &externalID
 		}
 
-		// Make API call
-		resp, err := scim.CreateUser(proofClient, organizationID, params)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.CreateUserWithResponse(context.Background(), organizationID, nil, body)
 		if err != nil {
 			fmt.Println("Error creating user:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -174,53 +187,57 @@ var scimUpdateUserCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		params := &scim.UpdateUserParams{
+		body := scim.CreateUserCopy1JSONRequestBody{
 			UserName: userName,
-			Active:   active,
 		}
+
+		// Set active status
+		activeStr := "true"
+		if !active {
+			activeStr = "false"
+		}
+		body.Active = &activeStr
 
 		// Add name if provided
 		if givenName != "" || familyName != "" {
-			params.Name = &scim.UserName{
-				GivenName:  givenName,
-				FamilyName: familyName,
+			body.Name = &struct {
+				FamilyName *string `json:"familyName,omitempty"`
+				GivenName  *string `json:"givenName,omitempty"`
+			}{}
+			if givenName != "" {
+				body.Name.GivenName = &givenName
+			}
+			if familyName != "" {
+				body.Name.FamilyName = &familyName
 			}
 		}
 
 		// Add email if provided
 		if email != "" {
-			params.Emails = []scim.UserEmail{
-				{
-					Value:   email,
-					Primary: true,
-				},
-			}
+			emails := []string{email}
+			body.Emails = &emails
 		}
 
 		// Add roles if provided
 		if len(roles) > 0 {
-			for i, role := range roles {
-				params.Roles = append(params.Roles, scim.UserRole{
-					Value:   role,
-					Primary: i == 0, // First role is primary
-				})
-			}
+			body.Roles = &roles
 		}
 
 		// Add external ID if provided
 		if externalID != "" {
-			params.ExternalID = externalID
+			body.ExternalId = &externalID
 		}
 
-		// Make API call
-		resp, err := scim.UpdateUser(proofClient, organizationID, userID, params)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.CreateUserCopy1WithResponse(context.Background(), organizationID, userID, nil, body)
 		if err != nil {
 			fmt.Println("Error updating user:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -242,7 +259,17 @@ var scimPatchUserCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		var patchOps []scim.PatchOperation
+		// Build SCIM patch request body
+		type PatchOperation struct {
+			Op    string `json:"op"`
+			Path  string `json:"path,omitempty"`
+			Value any    `json:"value,omitempty"`
+		}
+		type PatchRequest struct {
+			Operations []PatchOperation `json:"Operations"`
+		}
+
+		var patchOps []PatchOperation
 		for _, op := range operations {
 			// Parse operation string in format "op:path:value"
 			parts := strings.SplitN(op, ":", 3)
@@ -251,7 +278,7 @@ var scimPatchUserCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			patchOp := scim.PatchOperation{
+			patchOp := PatchOperation{
 				Op:   parts[0],
 				Path: parts[1],
 			}
@@ -271,19 +298,34 @@ var scimPatchUserCmd = &cobra.Command{
 			patchOps = append(patchOps, patchOp)
 		}
 
-		params := &scim.PatchUserParams{
+		patchReq := PatchRequest{
 			Operations: patchOps,
 		}
 
-		// Make API call
-		resp, err := scim.PatchUser(proofClient, organizationID, userID, params)
+		// Marshal to JSON for raw body request
+		bodyBytes, err := json.Marshal(patchReq)
+		if err != nil {
+			fmt.Println("Error marshaling patch request:", err)
+			os.Exit(1)
+		}
+
+		// Make API call using SDK client with raw body
+		client := getSCIMClient()
+		resp, err := client.ReplaceUserCopyWithBodyWithResponse(
+			context.Background(),
+			organizationID,
+			userID,
+			nil,
+			"application/json",
+			bytes.NewReader(bodyBytes),
+		)
 		if err != nil {
 			fmt.Println("Error patching user:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -297,15 +339,16 @@ var scimDeleteUserCmd = &cobra.Command{
 		organizationID := args[0]
 		userID := args[1]
 
-		// Make API call
-		resp, err := scim.DeleteUser(proofClient, organizationID, userID)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.ReplaceUserCopy1WithResponse(context.Background(), organizationID, userID, nil)
 		if err != nil {
 			fmt.Println("Error deleting user:", err)
 			os.Exit(1)
 		}
 
-		if len(resp) > 0 {
-			PrintResponse(resp)
+		if len(resp.Body) > 0 {
+			PrintResponse(resp.Body)
 		} else {
 			fmt.Println("SCIM user deleted successfully")
 		}
@@ -328,15 +371,16 @@ var scimGetUserSchemaCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		organizationID := args[0]
 
-		// Make API call
-		resp, err := scim.GetUserSchema(proofClient, organizationID)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.RetrieveUsersSchemaWithResponse(context.Background(), organizationID)
 		if err != nil {
 			fmt.Println("Error getting user schema:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -349,15 +393,16 @@ var scimGetServiceProviderConfigCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		organizationID := args[0]
 
-		// Make API call
-		resp, err := scim.GetServiceProviderConfig(proofClient, organizationID)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.RetrieveServiceProviderConfigCopyWithResponse(context.Background(), organizationID)
 		if err != nil {
 			fmt.Println("Error getting service provider config:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 
@@ -370,15 +415,16 @@ var scimGetResourceTypesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		organizationID := args[0]
 
-		// Make API call
-		resp, err := scim.GetResourceTypes(proofClient, organizationID)
+		// Make API call using SDK client
+		client := getSCIMClient()
+		resp, err := client.RetrieveUsersSchemaCopyWithResponse(context.Background(), organizationID)
 		if err != nil {
 			fmt.Println("Error getting resource types:", err)
 			os.Exit(1)
 		}
 
 		// Use global helper to print response
-		PrintResponse(resp)
+		PrintResponse(resp.Body)
 	},
 }
 

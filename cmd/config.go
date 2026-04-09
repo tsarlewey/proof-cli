@@ -30,14 +30,14 @@ var configGetCmd = &cobra.Command{
 		}
 		fmt.Println("API Endpoint:", config.APIEndpoint)
 		fmt.Println("Timeout:", config.Timeout)
-		
+
 		// Show API Key status
 		if config.APIKey != "" {
 			fmt.Println("API Key: configured")
 		} else {
 			fmt.Println("API Key: not configured")
 		}
-		
+
 		// Show OAuth configuration
 		if config.OAuth != nil {
 			fmt.Println("OAuth Enabled:", config.OAuth.Enabled)

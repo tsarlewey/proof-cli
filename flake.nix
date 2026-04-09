@@ -34,6 +34,7 @@
             gopls
             gotools
             go-tools
+            oapi-codegen
           ];
         };
       });

@@ -41,6 +41,23 @@ In order to get an API Key, you'll need an account with API Usage. You can get t
 
 After your account is created and upgrade use https://dev.proof.com/docs/api-keys to setup your key.
 
+### OAuth 2.0 Authentication
+
+The CLI supports OAuth 2.0 client credentials flow for secure API authentication:
+
+```bash
+# Configure OAuth credentials
+proof config set-oauth <client-id> <client-secret> [--scope="read write"]
+
+# Test OAuth authentication
+proof config test-oauth
+
+# Disable OAuth (fallback to API key)
+proof config disable-oauth
+```
+
+OAuth tokens are automatically refreshed before expiration (5-minute buffer).
+
 ### 2. Basic Usage
 
 The CLI is organized into three main API groups:
@@ -398,6 +415,20 @@ go build -o proof
 ```bash
 go fmt ./...
 go vet ./...
+```
+
+### SDK Architecture
+
+The CLI uses auto-generated SDK clients from OpenAPI specs via `oapi-codegen`:
+
+- `pkg/sdk/business/` - Business API client
+- `pkg/sdk/realestate/` - Real Estate API client
+- `pkg/sdk/scim/` - SCIM API client
+- `pkg/sdk/common/` - Shared authentication adapter
+
+Regenerate SDKs after OpenAPI spec updates:
+```bash
+make generate
 ```
 
 ## Support

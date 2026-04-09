@@ -8,6 +8,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/common"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
+	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
 )
 
@@ -15,6 +19,11 @@ var (
 	prettyPrint bool
 	verbose     bool
 	proofClient *utils.ProofClient
+
+	// SDK clients - lazily initialized
+	businessClient   *business.ClientWithResponses
+	realestateClient *realestate.ClientWithResponses
+	scimClient       *scim.ClientWithResponses
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -50,6 +59,48 @@ func initializeForAPICall(cmd *cobra.Command, args []string) {
 		utils.HandleError(err, "Failed to create client")
 		proofClient = client
 	}
+}
+
+// getBusinessClient returns a lazily-initialized Business SDK client
+func getBusinessClient() *business.ClientWithResponses {
+	if businessClient == nil {
+		authDoer := common.NewAuthenticatedDoer(proofClient)
+		client, err := business.NewClientWithResponses(
+			proofClient.GetConfig().APIEndpoint,
+			business.WithHTTPClient(authDoer),
+		)
+		utils.HandleError(err, "Failed to create Business SDK client")
+		businessClient = client
+	}
+	return businessClient
+}
+
+// getRealEstateClient returns a lazily-initialized Real Estate SDK client
+func getRealEstateClient() *realestate.ClientWithResponses {
+	if realestateClient == nil {
+		authDoer := common.NewAuthenticatedDoer(proofClient)
+		client, err := realestate.NewClientWithResponses(
+			proofClient.GetConfig().APIEndpoint,
+			realestate.WithHTTPClient(authDoer),
+		)
+		utils.HandleError(err, "Failed to create Real Estate SDK client")
+		realestateClient = client
+	}
+	return realestateClient
+}
+
+// getSCIMClient returns a lazily-initialized SCIM SDK client
+func getSCIMClient() *scim.ClientWithResponses {
+	if scimClient == nil {
+		authDoer := common.NewAuthenticatedDoer(proofClient)
+		client, err := scim.NewClientWithResponses(
+			proofClient.GetConfig().APIEndpoint,
+			scim.WithHTTPClient(authDoer),
+		)
+		utils.HandleError(err, "Failed to create SCIM SDK client")
+		scimClient = client
+	}
+	return scimClient
 }
 
 // PrintResponse handles response output with optional pretty printing
