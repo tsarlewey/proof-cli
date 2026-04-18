@@ -410,11 +410,24 @@ go mod download
 go build -o proof
 ```
 
-### Code Formatting
+### Makefile Targets
+
+The project provides a `Makefile` for common development tasks:
 
 ```bash
-go fmt ./...
-go vet ./...
+make build          # Build the ./proof binary
+make install        # Install the CLI via go install
+make fmt            # Run go fmt
+make vet            # Run go vet
+make test           # Run all tests
+make test-race      # Run all tests with -race
+make coverage       # Run tests with coverage profile
+make check          # fmt + vet + build + test-race
+make tools          # Install the oapi-codegen tool dependency
+make download-specs # Download OpenAPI specs and apply fixups
+make generate       # Regenerate SDK clients from OpenAPI specs
+make regenerate     # download-specs + generate + build + test
+make clean          # Remove binary and generated files
 ```
 
 ### SDK Architecture
@@ -424,12 +437,45 @@ The CLI uses auto-generated SDK clients from OpenAPI specs via `oapi-codegen`:
 - `pkg/sdk/business/` - Business API client
 - `pkg/sdk/realestate/` - Real Estate API client
 - `pkg/sdk/scim/` - SCIM API client
-- `pkg/sdk/common/` - Shared authentication adapter
+- `pkg/sdk/logs/` - Security Events (logs) API client
+- `pkg/sdk/certificates/` - Organization certificates API client
+- `pkg/sdk/common/` - Shared authentication adapter (`AuthenticatedDoer`)
 
-Regenerate SDKs after OpenAPI spec updates:
+Each SDK package contains a generated `client.gen.go`, its own `oapi-codegen.yaml` config, and unit tests. `client.gen.go` files are generated; do not edit them by hand.
+
+### Regenerating SDKs
+
+End-to-end (recommended after upstream spec changes):
+
+```bash
+make regenerate
+```
+
+This runs `download-specs` → `generate` → `build` → `test`.
+
+`make download-specs` pulls the latest specs from `dev.proof.com` into `openapi/` and applies two preprocessing steps before generation:
+
+- `scripts/fix-openapi-refs.py` — inlines deeply nested `$ref` chains that `oapi-codegen` can't resolve.
+- `scripts/fix-scim-operation-ids.py` — rewrites SCIM `operationId` values so the generated methods are named `ListUsersWithResponse`, `GetUserWithResponse`, etc., instead of the upstream defaults.
+
+To regenerate without re-downloading:
+
 ```bash
 make generate
 ```
+
+### Adding or Updating Commands
+
+CLI commands live in `cmd/` (one file per API surface) and are built with [Cobra](https://github.com/spf13/cobra). Each command's `Run` closure calls a method on the generated SDK client via the factory helpers in `cmd/root.go` (`getBusinessClient`, `getRealEstateClient`, `getSCIMClient`). The factories wrap the SDK client with `common.AuthenticatedDoer`, which injects OAuth bearer tokens or the API key on every request.
+
+Shared helpers in `cmd/root.go`:
+
+- `initializeForAPICall` — lazy client setup, used as `PreRun` on every API-calling command.
+- `PrintResponse` / `PrintVerbose` — response output with optional pretty-printing and colorization.
+- `parseDateFlag` — parses optional date-flag values, exits with a clear message on parse failure.
+- `isSuccess` — 2xx status-code check.
+
+Errors from SDK calls are funneled through `utils.HandleError(err, "action phrase")` which prints to stderr and exits 1.
 
 ## Support
 
