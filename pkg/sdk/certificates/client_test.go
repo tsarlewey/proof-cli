@@ -234,7 +234,7 @@ func TestNewPostV2CertificatesRequest(t *testing.T) {
 
 // TestParseGetV1CertificatesResponse verifies list response parsing
 func TestParseGetV1CertificatesResponse(t *testing.T) {
-	t.Run("parses 200 response with certificates", func(t *testing.T) {
+	t.Run("deserializes certificate metadata", func(t *testing.T) {
 		body := struct {
 			Results *[]OrganizationCertificateShortResponse `json:"results,omitempty"`
 		}{
@@ -247,16 +247,33 @@ func TestParseGetV1CertificatesResponse(t *testing.T) {
 					ValidTo:      ptr("2025-01-01T00:00:00Z"),
 					External:     ptr(false),
 				},
+				{
+					Id:           ptr("cert-456"),
+					Subject:      ptr("CN=External,O=Partner"),
+					SerialNumber: ptr("DEF456"),
+					External:     ptr(true),
+				},
 			},
 		}
 		resp := mockJSONResponse(200, body)
 
 		parsed, err := ParseGetV1CertificatesResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 200, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON200)
-		assert.Len(t, *parsed.JSON200.Results, 1)
-		assert.Equal(t, "cert-123", *(*parsed.JSON200.Results)[0].Id)
+		require.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200.Results)
+		require.Len(t, *parsed.JSON200.Results, 2)
+
+		first := (*parsed.JSON200.Results)[0]
+		assert.Equal(t, "cert-123", *first.Id)
+		assert.Equal(t, "CN=Test,O=Test Org", *first.Subject)
+		assert.Equal(t, "ABC123", *first.SerialNumber)
+		assert.Equal(t, "2024-01-01T00:00:00Z", *first.ValidFrom)
+		assert.Equal(t, "2025-01-01T00:00:00Z", *first.ValidTo)
+		assert.False(t, *first.External)
+
+		second := (*parsed.JSON200.Results)[1]
+		assert.Equal(t, "cert-456", *second.Id)
+		assert.True(t, *second.External, "External flag must round-trip as true")
 	})
 
 	t.Run("parses empty results", func(t *testing.T) {
@@ -277,7 +294,8 @@ func TestParseGetV1CertificatesResponse(t *testing.T) {
 
 // TestParseGetV1CertificatesIdResponse verifies get certificate response parsing
 func TestParseGetV1CertificatesIdResponse(t *testing.T) {
-	t.Run("parses 200 response with full certificate", func(t *testing.T) {
+	t.Run("deserializes full certificate including chain and issuer", func(t *testing.T) {
+		chain := "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----"
 		body := struct {
 			Result *OrganizationCertificateFullResponse `json:"result,omitempty"`
 		}{
@@ -286,7 +304,7 @@ func TestParseGetV1CertificatesIdResponse(t *testing.T) {
 				Subject:          ptr("CN=Test,O=Test Org"),
 				Issuer:           ptr("CN=Issuer,O=Issuer Org"),
 				SerialNumber:     ptr("ABC123"),
-				CertificateChain: ptr("-----BEGIN CERTIFICATE-----\nMIIC..."),
+				CertificateChain: ptr(chain),
 				ValidFrom:        ptr("2024-01-01T00:00:00Z"),
 				ValidTo:          ptr("2025-01-01T00:00:00Z"),
 				External:         ptr(false),
@@ -296,11 +314,16 @@ func TestParseGetV1CertificatesIdResponse(t *testing.T) {
 
 		parsed, err := ParseGetV1CertificatesIdResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 200, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON200)
-		assert.NotNil(t, parsed.JSON200.Result)
-		assert.Equal(t, "cert-123", *parsed.JSON200.Result.Id)
-		assert.NotNil(t, parsed.JSON200.Result.CertificateChain)
+		require.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200.Result)
+
+		r := parsed.JSON200.Result
+		assert.Equal(t, "cert-123", *r.Id)
+		assert.Equal(t, "CN=Test,O=Test Org", *r.Subject)
+		assert.Equal(t, "CN=Issuer,O=Issuer Org", *r.Issuer)
+		assert.Equal(t, "ABC123", *r.SerialNumber)
+		assert.Equal(t, chain, *r.CertificateChain)
+		assert.False(t, *r.External)
 	})
 }
 
@@ -407,86 +430,6 @@ func TestParsePostV1CertificatesIdSignResponse(t *testing.T) {
 		assert.NotNil(t, parsed.JSON200)
 		assert.Len(t, *parsed.JSON200.Result, 2)
 	})
-}
-
-// TestResponseStatusMethods verifies status methods on response types
-func TestResponseStatusMethods(t *testing.T) {
-	testCases := []struct {
-		name     string
-		testFunc func(t *testing.T)
-	}{
-		{
-			name: "GetV1CertificatesResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetV1CertificatesResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetV1CertificatesResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-				assert.Equal(t, http.StatusText(0), nilResp.Status())
-			},
-		},
-		{
-			name: "PostV1CertificatesResponse",
-			testFunc: func(t *testing.T) {
-				resp := &PostV1CertificatesResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &PostV1CertificatesResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "DeleteV1CertificatesIdResponse",
-			testFunc: func(t *testing.T) {
-				resp := &DeleteV1CertificatesIdResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &DeleteV1CertificatesIdResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetV1CertificatesIdResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetV1CertificatesIdResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetV1CertificatesIdResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "PostV1CertificatesIdSignResponse",
-			testFunc: func(t *testing.T) {
-				resp := &PostV1CertificatesIdSignResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &PostV1CertificatesIdSignResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "PostV2CertificatesResponse",
-			testFunc: func(t *testing.T) {
-				resp := &PostV2CertificatesResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &PostV2CertificatesResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.testFunc)
-	}
 }
 
 // TestClientWithResponsesMethods verifies client with responses wrapper methods

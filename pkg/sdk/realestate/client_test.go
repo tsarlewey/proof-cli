@@ -319,25 +319,41 @@ func TestNewVerifyPropertyAddressRequest(t *testing.T) {
 	})
 }
 
-// TestParseGetAllMortgageTransactionsResponse verifies list transactions response parsing
+// TestParseGetAllMortgageTransactionsResponse verifies list transactions
+// response parsing by asserting on deserialized payload fields.
 func TestParseGetAllMortgageTransactionsResponse(t *testing.T) {
-	t.Run("parses 200 response", func(t *testing.T) {
+	t.Run("deserializes nested transaction fields", func(t *testing.T) {
 		body := TransactionObjects{
 			Data: &[]TransactionObject{
 				{
-					Id: ptr("txn-123"),
+					Id:         ptr("txn-123"),
+					ExternalId: ptr("ext-abc"),
+					FileNumber: ptr("FILE-42"),
+					LoanNumber: ptr("LOAN-99"),
+					Cost:       ptr(float32(149.95)),
 				},
+				{Id: ptr("txn-456")},
 			},
 		}
 		resp := mockJSONResponse(200, body)
 
 		parsed, err := ParseGetAllMortgageTransactionsResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 200, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200.Data)
+		require.Len(t, *parsed.JSON200.Data, 2)
+
+		first := (*parsed.JSON200.Data)[0]
+		assert.Equal(t, "txn-123", *first.Id)
+		assert.Equal(t, "ext-abc", *first.ExternalId)
+		assert.Equal(t, "FILE-42", *first.FileNumber)
+		assert.Equal(t, "LOAN-99", *first.LoanNumber)
+		assert.InDelta(t, 149.95, *first.Cost, 0.001)
+
+		assert.Equal(t, "txn-456", *(*parsed.JSON200.Data)[1].Id)
 	})
 
-	t.Run("handles empty response body", func(t *testing.T) {
+	t.Run("empty body yields nil JSON200 without error", func(t *testing.T) {
 		resp := &http.Response{
 			StatusCode: 204,
 			Status:     http.StatusText(204),
@@ -348,6 +364,7 @@ func TestParseGetAllMortgageTransactionsResponse(t *testing.T) {
 		parsed, err := ParseGetAllMortgageTransactionsResponse(resp)
 		require.NoError(t, err)
 		assert.Equal(t, 204, parsed.StatusCode())
+		assert.Nil(t, parsed.JSON200)
 	})
 }
 
@@ -365,86 +382,6 @@ func TestParseGetMortgageTransactionResponse(t *testing.T) {
 		assert.NotNil(t, parsed.JSON200)
 		assert.Equal(t, "txn-123", *parsed.JSON200.Id)
 	})
-}
-
-// TestResponseStatusMethods verifies status methods on response types
-func TestResponseStatusMethods(t *testing.T) {
-	testCases := []struct {
-		name     string
-		testFunc func(t *testing.T)
-	}{
-		{
-			name: "GetAllMortgageTransactionsResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetAllMortgageTransactionsResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetAllMortgageTransactionsResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-				assert.Equal(t, http.StatusText(0), nilResp.Status())
-			},
-		},
-		{
-			name: "GetMortgageTransactionResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetMortgageTransactionResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetMortgageTransactionResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "DeleteMortgageTransactionResponse",
-			testFunc: func(t *testing.T) {
-				resp := &DeleteMortgageTransactionResponse{HTTPResponse: &http.Response{StatusCode: 204, Status: "204 No Content"}}
-				assert.Equal(t, 204, resp.StatusCode())
-				assert.Equal(t, "204 No Content", resp.Status())
-
-				nilResp := &DeleteMortgageTransactionResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetAllMortgageNotariesResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetAllMortgageNotariesResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetAllMortgageNotariesResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetMortgageWebhookURLResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetMortgageWebhookURLResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetMortgageWebhookURLResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetRecordingLocationsResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetRecordingLocationsResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetRecordingLocationsResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.testFunc)
-	}
 }
 
 // TestClientWithResponsesMethods verifies client with responses wrapper methods

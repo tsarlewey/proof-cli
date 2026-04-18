@@ -1,9 +1,6 @@
-// Not yet used to be used
 package utils
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -133,93 +130,6 @@ func (c *ProofClient) TestOAuthAuthentication() (*OAuthToken, error) {
 	return token, nil
 }
 
-// RequestOptions allows customizing requests with additional headers
-type RequestOptions struct {
-	ContentType string
-	Accept      string
-}
-
-func (c *ProofClient) Request(method, path string, body any, opts ...*RequestOptions) ([]byte, error) {
-	url := fmt.Sprintf("%s%s", c.config.APIEndpoint, path)
-
-	var bodyReader io.Reader
-	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
-		}
-		bodyReader = bytes.NewBuffer(jsonBody)
-	}
-
-	req, err := http.NewRequest(method, url, bodyReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set authentication header
-	if c.config.OAuth != nil && c.config.OAuth.Enabled {
-		// Use OAuth authentication
-		token, err := c.getValidOAuthToken()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get OAuth token: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-	} else {
-		req.Header.Set("ApiKey", c.apiKey)
-	}
-
-	// Set content type from options or use default
-	contentType := "application/json"
-	if len(opts) > 0 && opts[0] != nil && opts[0].ContentType != "" {
-		contentType = opts[0].ContentType
-	}
-	req.Header.Set("Content-Type", contentType)
-
-	// Set accept header from options or use default
-	accept := "application/json"
-	if len(opts) > 0 && opts[0] != nil && opts[0].Accept != "" {
-		accept = opts[0].Accept
-	}
-	req.Header.Set("Accept", accept)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
-}
-
-func (c *ProofClient) Get(path string, opts ...*RequestOptions) ([]byte, error) {
-	return c.Request("GET", path, nil, opts...)
-}
-
-func (c *ProofClient) Post(path string, body any, opts ...*RequestOptions) ([]byte, error) {
-	return c.Request("POST", path, body, opts...)
-}
-
-func (c *ProofClient) Put(path string, body any, opts ...*RequestOptions) ([]byte, error) {
-	return c.Request("PUT", path, body, opts...)
-}
-
-func (c *ProofClient) Patch(path string, body any, opts ...*RequestOptions) ([]byte, error) {
-	return c.Request("PATCH", path, body, opts...)
-}
-
-func (c *ProofClient) Delete(path string, opts ...*RequestOptions) ([]byte, error) {
-	return c.Request("DELETE", path, nil, opts...)
-}
-
 // AddAuthHeaders adds authentication headers (OAuth Bearer token or API key) to an HTTP request.
 // This is useful for integrating with generated SDK clients that require a custom HTTP client.
 func (c *ProofClient) AddAuthHeaders(req *http.Request) error {
@@ -251,11 +161,4 @@ func HandleError(err error, message string) {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", message, err)
 		os.Exit(1)
 	}
-}
-
-func Must[T any](val T, err error) T {
-	if err != nil {
-		HandleError(err, "Operation failed")
-	}
-	return val
 }

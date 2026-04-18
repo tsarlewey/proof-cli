@@ -2,8 +2,6 @@ package common
 
 import (
 	"net/http"
-
-	"github.com/tsarlewey/proof-cli/pkg/utils"
 )
 
 // AuthProvider defines the interface for adding authentication headers to requests.
@@ -20,18 +18,10 @@ type AuthenticatedDoer struct {
 	client AuthProvider
 }
 
-// NewAuthenticatedDoer creates a new AuthenticatedDoer that wraps the given ProofClient.
-func NewAuthenticatedDoer(client *utils.ProofClient) *AuthenticatedDoer {
+// NewAuthenticatedDoer creates a new AuthenticatedDoer that wraps the given AuthProvider.
+func NewAuthenticatedDoer(client AuthProvider) *AuthenticatedDoer {
 	return &AuthenticatedDoer{
 		client: client,
-	}
-}
-
-// NewAuthenticatedDoerWithProvider creates a new AuthenticatedDoer with a custom AuthProvider.
-// This is useful for testing with mock implementations.
-func NewAuthenticatedDoerWithProvider(provider AuthProvider) *AuthenticatedDoer {
-	return &AuthenticatedDoer{
-		client: provider,
 	}
 }
 

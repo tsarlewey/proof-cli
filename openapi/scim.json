@@ -320,7 +320,7 @@
       "get": {
         "summary": "List Users",
         "description": "",
-        "operationId": "retrieve-resource-types-copy",
+        "operationId": "list-users",
         "parameters": [
           {
             "name": "organization_id",
@@ -556,7 +556,7 @@
       "get": {
         "summary": "Retrieve User",
         "description": "",
-        "operationId": "create-user-copy",
+        "operationId": "get-user",
         "parameters": [
           {
             "name": "organization_id",
@@ -753,7 +753,7 @@
       "put": {
         "summary": "Replace User",
         "description": "",
-        "operationId": "create-user-copy-1",
+        "operationId": "update-user",
         "parameters": [
           {
             "name": "organization_id",
@@ -1053,7 +1053,7 @@
       "patch": {
         "summary": "Update User",
         "description": "",
-        "operationId": "replace-user-copy",
+        "operationId": "patch-user",
         "parameters": [
           {
             "name": "organization_id",
@@ -1344,7 +1344,7 @@
       "delete": {
         "summary": "Delete User",
         "description": "",
-        "operationId": "replace-user-copy-1",
+        "operationId": "delete-user",
         "parameters": [
           {
             "name": "organization_id",
@@ -2096,7 +2096,7 @@
       "get": {
         "summary": "Retrieve Service Provider Config",
         "description": "Returns a JSON structure that describes the SCIM resource operations compliance, authentication methods, and data models available.",
-        "operationId": "retrieve-users-schema-copy",
+        "operationId": "get-service-provider-config",
         "parameters": [
           {
             "name": "organization_id",
@@ -2299,7 +2299,7 @@
       "get": {
         "summary": "Retrieve Resource Types",
         "description": "",
-        "operationId": "retrieve-service-provider-config-copy",
+        "operationId": "get-resource-types",
         "parameters": [
           {
             "name": "organization_id",

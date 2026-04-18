@@ -356,12 +356,20 @@ func TestNewDeleteDocumentRequest(t *testing.T) {
 }
 
 // TestParseGetAllTransactionsResponse verifies list transactions response parsing
+// by asserting on actual payload fields, not just the status code.
 func TestParseGetAllTransactionsResponse(t *testing.T) {
-	t.Run("parses 200 response", func(t *testing.T) {
+	t.Run("deserializes nested transaction fields", func(t *testing.T) {
+		status := TransactionObjectDetailedStatusComplete
 		body := TransactionObjects{
 			Data: &[]TransactionObject{
 				{
-					Id: ptr("txn-123"),
+					Id:             ptr("txn-123"),
+					ExternalId:     ptr("external-abc"),
+					Cost:           ptr(float32(29.99)),
+					DetailedStatus: &status,
+				},
+				{
+					Id: ptr("txn-456"),
 				},
 			},
 		}
@@ -369,11 +377,20 @@ func TestParseGetAllTransactionsResponse(t *testing.T) {
 
 		parsed, err := ParseGetAllTransactionsResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 200, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200.Data)
+		require.Len(t, *parsed.JSON200.Data, 2)
+
+		first := (*parsed.JSON200.Data)[0]
+		assert.Equal(t, "txn-123", *first.Id)
+		assert.Equal(t, "external-abc", *first.ExternalId)
+		assert.InDelta(t, 29.99, *first.Cost, 0.001)
+		assert.Equal(t, TransactionObjectDetailedStatusComplete, *first.DetailedStatus)
+
+		assert.Equal(t, "txn-456", *(*parsed.JSON200.Data)[1].Id)
 	})
 
-	t.Run("handles empty response body", func(t *testing.T) {
+	t.Run("empty body yields nil JSON200 without error", func(t *testing.T) {
 		resp := &http.Response{
 			StatusCode: 204,
 			Status:     http.StatusText(204),
@@ -384,6 +401,7 @@ func TestParseGetAllTransactionsResponse(t *testing.T) {
 		parsed, err := ParseGetAllTransactionsResponse(resp)
 		require.NoError(t, err)
 		assert.Equal(t, 204, parsed.StatusCode())
+		assert.Nil(t, parsed.JSON200)
 	})
 }
 
@@ -495,108 +513,6 @@ func TestParseDeleteDocumentResponse(t *testing.T) {
 		assert.Equal(t, 422, parsed.StatusCode())
 		assert.NotNil(t, parsed.JSON422)
 	})
-}
-
-// TestResponseStatusMethods verifies status methods on response types
-func TestResponseStatusMethods(t *testing.T) {
-	testCases := []struct {
-		name     string
-		testFunc func(t *testing.T)
-	}{
-		{
-			name: "GetAllTransactionsResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetAllTransactionsResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetAllTransactionsResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-				assert.Equal(t, http.StatusText(0), nilResp.Status())
-			},
-		},
-		{
-			name: "GetTransactionResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetTransactionResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetTransactionResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "DeleteTransactionResponse",
-			testFunc: func(t *testing.T) {
-				resp := &DeleteTransactionResponse{HTTPResponse: &http.Response{StatusCode: 204, Status: "204 No Content"}}
-				assert.Equal(t, 204, resp.StatusCode())
-				assert.Equal(t, "204 No Content", resp.Status())
-
-				nilResp := &DeleteTransactionResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetAllNotariesResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetAllNotariesResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetAllNotariesResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetNotaryResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetNotaryResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetNotaryResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "DeleteDocumentResponse",
-			testFunc: func(t *testing.T) {
-				resp := &DeleteDocumentResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &DeleteDocumentResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetWebhookURLResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetWebhookURLResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetWebhookURLResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "GetOrganizationInformationResponse",
-			testFunc: func(t *testing.T) {
-				resp := &GetOrganizationInformationResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &GetOrganizationInformationResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.testFunc)
-	}
 }
 
 // TestClientWithResponsesMethods verifies client with responses wrapper methods

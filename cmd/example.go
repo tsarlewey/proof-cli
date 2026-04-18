@@ -3,12 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
 	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
 	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
+	"github.com/tsarlewey/proof-cli/pkg/utils"
 )
 
 // exampleCmd represents the example command group
@@ -39,10 +39,7 @@ var exampleListBusinessTransactionsCmd = &cobra.Command{
 		fmt.Println("Fetching business transactions...")
 		client := getBusinessClient()
 		resp, err := client.GetAllTransactionsWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error fetching transactions:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "fetching transactions")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -69,10 +66,7 @@ This example creates a notary for demonstration purposes.`,
 		fmt.Println("Creating notary...")
 		client := getBusinessClient()
 		resp, err := client.CreateNotaryWithResponse(context.Background(), body)
-		if err != nil {
-			fmt.Println("Error creating notary:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating notary")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -100,10 +94,7 @@ var exampleListRealEstateTransactionsCmd = &cobra.Command{
 		fmt.Println("Fetching real estate transactions...")
 		client := getRealEstateClient()
 		resp, err := client.GetAllMortgageTransactionsWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error fetching real estate transactions:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "fetching real estate transactions")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -136,10 +127,7 @@ var exampleVerifyAddressCmd = &cobra.Command{
 		fmt.Println("Verifying address...")
 		client := getRealEstateClient()
 		resp, err := client.GetRecordingLocationsWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error verifying address:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "verifying address")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -161,7 +149,7 @@ var exampleListSCIMUsersCmd = &cobra.Command{
 		// Build query parameters
 		startIndex := int32(1)
 		count := int32(10)
-		params := &scim.RetrieveResourceTypesCopyParams{
+		params := &scim.ListUsersParams{
 			StartIndex: &startIndex,
 			Count:      &count,
 		}
@@ -169,11 +157,8 @@ var exampleListSCIMUsersCmd = &cobra.Command{
 		// Make API call using SDK client
 		fmt.Printf("Fetching SCIM users for organization %s...\n", organizationID)
 		client := getSCIMClient()
-		resp, err := client.RetrieveResourceTypesCopyWithResponse(context.Background(), organizationID, params)
-		if err != nil {
-			fmt.Println("Error listing users:", err)
-			os.Exit(1)
-		}
+		resp, err := client.ListUsersWithResponse(context.Background(), organizationID, params)
+		utils.HandleError(err, "listing users")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -194,10 +179,7 @@ var exampleGetSCIMSchemaCmd = &cobra.Command{
 		fmt.Printf("Fetching SCIM user schema for organization %s...\n", organizationID)
 		client := getSCIMClient()
 		resp, err := client.RetrieveUsersSchemaWithResponse(context.Background(), organizationID)
-		if err != nil {
-			fmt.Println("Error getting user schema:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting user schema")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)

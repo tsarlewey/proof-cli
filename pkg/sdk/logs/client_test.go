@@ -147,12 +147,18 @@ func TestNewListSecurityEventsRequest(t *testing.T) {
 
 // TestParseListSecurityEventsResponse verifies response parsing
 func TestParseListSecurityEventsResponse(t *testing.T) {
-	t.Run("parses 200 response", func(t *testing.T) {
+	t.Run("deserializes events and pagination meta", func(t *testing.T) {
 		body := SecurityEventsResponse{
 			Data: &[]SecurityEventObject{
 				{
 					ActivityId:   ptr(1),
 					ActivityName: ptr("Login"),
+					ClassName:    ptr("Authentication"),
+					Severity:     ptr("Informational"),
+				},
+				{
+					ActivityId:   ptr(2),
+					ActivityName: ptr("Logout"),
 					ClassName:    ptr("Authentication"),
 					Severity:     ptr("Informational"),
 				},
@@ -162,18 +168,31 @@ func TestParseListSecurityEventsResponse(t *testing.T) {
 				HasMore    *bool   `json:"has_more,omitempty"`
 				NextCursor *string `json:"next_cursor,omitempty"`
 			}{
-				Count:   ptr(1),
-				HasMore: ptr(false),
+				Count:      ptr(2),
+				HasMore:    ptr(true),
+				NextCursor: ptr("cursor-xyz"),
 			},
 		}
 		resp := mockJSONResponse(200, body)
 
 		parsed, err := ParseListSecurityEventsResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 200, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON200)
-		assert.NotNil(t, parsed.JSON200.Data)
-		assert.Len(t, *parsed.JSON200.Data, 1)
+		require.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200.Data)
+		require.Len(t, *parsed.JSON200.Data, 2)
+
+		first := (*parsed.JSON200.Data)[0]
+		assert.Equal(t, 1, *first.ActivityId)
+		assert.Equal(t, "Login", *first.ActivityName)
+		assert.Equal(t, "Authentication", *first.ClassName)
+		assert.Equal(t, "Informational", *first.Severity)
+
+		assert.Equal(t, "Logout", *(*parsed.JSON200.Data)[1].ActivityName)
+
+		require.NotNil(t, parsed.JSON200.Meta)
+		assert.Equal(t, 2, *parsed.JSON200.Meta.Count)
+		assert.True(t, *parsed.JSON200.Meta.HasMore)
+		assert.Equal(t, "cursor-xyz", *parsed.JSON200.Meta.NextCursor)
 	})
 
 	t.Run("parses 400 error response", func(t *testing.T) {
@@ -214,37 +233,6 @@ func TestParseListSecurityEventsResponse(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 204, parsed.StatusCode())
 		assert.Nil(t, parsed.JSON200)
-	})
-}
-
-// TestListSecurityEventsResponse_StatusMethods verifies response status methods
-func TestListSecurityEventsResponse_StatusMethods(t *testing.T) {
-	t.Run("Status returns status text", func(t *testing.T) {
-		resp := &ListSecurityEventsResponse{
-			HTTPResponse: &http.Response{
-				Status: "200 OK",
-			},
-		}
-		assert.Equal(t, "200 OK", resp.Status())
-	})
-
-	t.Run("Status returns empty for nil response", func(t *testing.T) {
-		resp := &ListSecurityEventsResponse{}
-		assert.Equal(t, http.StatusText(0), resp.Status())
-	})
-
-	t.Run("StatusCode returns code", func(t *testing.T) {
-		resp := &ListSecurityEventsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-		}
-		assert.Equal(t, 200, resp.StatusCode())
-	})
-
-	t.Run("StatusCode returns 0 for nil response", func(t *testing.T) {
-		resp := &ListSecurityEventsResponse{}
-		assert.Equal(t, 0, resp.StatusCode())
 	})
 }
 

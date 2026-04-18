@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -51,9 +52,8 @@ func Execute() {
 	}
 }
 
-// initializeForAPICall sets up debug logging and ensures client is ready
+// initializeForAPICall ensures client is ready
 func initializeForAPICall(cmd *cobra.Command, args []string) {
-	toggleDebug(cmd, args)
 	if proofClient == nil {
 		client, err := utils.NewProofClient()
 		utils.HandleError(err, "Failed to create client")
@@ -220,6 +220,25 @@ func PrintVerbose(message string) {
 	if verbose {
 		fmt.Println(message)
 	}
+}
+
+// isSuccess reports whether an HTTP status code is in the 2xx range.
+func isSuccess(code int) bool {
+	return code >= 200 && code < 300
+}
+
+// parseDateFlag parses an optional date flag value. Returns nil when value is
+// empty. On parse failure it prints an error and exits.
+func parseDateFlag(flagName, value, layout string) *time.Time {
+	if value == "" {
+		return nil
+	}
+	t, err := time.Parse(layout, value)
+	if err != nil {
+		fmt.Printf("Error parsing %s: %v\n", flagName, err)
+		os.Exit(1)
+	}
+	return &t
 }
 
 func init() {

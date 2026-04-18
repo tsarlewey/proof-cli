@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewAuthenticatedDoerWithProvider(t *testing.T) {
+func TestNewAuthenticatedDoer_Provider(t *testing.T) {
 	// Arrange
 	mockProvider := new(MockAuthProvider)
 
 	// Act
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Assert
 	assert.NotNil(t, doer)
@@ -40,7 +40,7 @@ func TestAuthenticatedDoer_Do_WithOAuth(t *testing.T) {
 	mockProvider.On("HTTPClient").Return(&http.Client{Transport: mockTransport})
 	mockTransport.On("RoundTrip", mock.Anything).Return(expectedResp, nil)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)
@@ -71,7 +71,7 @@ func TestAuthenticatedDoer_Do_WithAPIKey(t *testing.T) {
 	mockProvider.On("HTTPClient").Return(&http.Client{Transport: mockTransport})
 	mockTransport.On("RoundTrip", mock.Anything).Return(expectedResp, nil)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)
@@ -95,7 +95,7 @@ func TestAuthenticatedDoer_Do_AuthError(t *testing.T) {
 	// Setup expectations - auth fails
 	mockProvider.On("AddAuthHeaders", req).Return(authError)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)
@@ -121,7 +121,7 @@ func TestAuthenticatedDoer_Do_HTTPError(t *testing.T) {
 	mockProvider.On("HTTPClient").Return(&http.Client{Transport: mockTransport})
 	mockTransport.On("RoundTrip", mock.Anything).Return(nil, httpError)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)
@@ -149,7 +149,7 @@ func TestAuthenticatedDoer_Do_HTTP400Error(t *testing.T) {
 	mockProvider.On("HTTPClient").Return(&http.Client{Transport: mockTransport})
 	mockTransport.On("RoundTrip", mock.Anything).Return(expectedResp, nil)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)
@@ -176,7 +176,7 @@ func TestAuthenticatedDoer_Do_HTTP500Error(t *testing.T) {
 	mockProvider.On("HTTPClient").Return(&http.Client{Transport: mockTransport})
 	mockTransport.On("RoundTrip", mock.Anything).Return(expectedResp, nil)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)
@@ -212,7 +212,7 @@ func TestAuthenticatedDoer_Do_PreservesRequestHeaders(t *testing.T) {
 			r.Header.Get("Authorization") == "Bearer token"
 	})).Return(expectedResp, nil)
 
-	doer := NewAuthenticatedDoerWithProvider(mockProvider)
+	doer := NewAuthenticatedDoer(mockProvider)
 
 	// Act
 	resp, err := doer.Do(req)

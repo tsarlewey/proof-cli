@@ -1,4 +1,4 @@
-package cmd
+package utils
 
 import (
 	"testing"
@@ -7,7 +7,6 @@ import (
 )
 
 func TestPtr_Int(t *testing.T) {
-	// Test with various int values
 	testCases := []struct {
 		name  string
 		input int
@@ -20,7 +19,7 @@ func TestPtr_Int(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ptr(tc.input)
+			result := Ptr(tc.input)
 
 			assert.NotNil(t, result)
 			assert.Equal(t, tc.input, *result)
@@ -41,7 +40,7 @@ func TestPtr_String(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ptr(tc.input)
+			result := Ptr(tc.input)
 
 			assert.NotNil(t, result)
 			assert.Equal(t, tc.input, *result)
@@ -50,11 +49,11 @@ func TestPtr_String(t *testing.T) {
 }
 
 func TestPtr_Bool(t *testing.T) {
-	trueResult := ptr(true)
+	trueResult := Ptr(true)
 	assert.NotNil(t, trueResult)
 	assert.True(t, *trueResult)
 
-	falseResult := ptr(false)
+	falseResult := Ptr(false)
 	assert.NotNil(t, falseResult)
 	assert.False(t, *falseResult)
 }
@@ -72,7 +71,7 @@ func TestPtr_Float(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ptr(tc.input)
+			result := Ptr(tc.input)
 
 			assert.NotNil(t, result)
 			assert.Equal(t, tc.input, *result)
@@ -81,7 +80,7 @@ func TestPtr_Float(t *testing.T) {
 }
 
 func TestPtrIfNotEmpty_Empty(t *testing.T) {
-	result := ptrIfNotEmpty("")
+	result := PtrIfNotEmpty("")
 
 	assert.Nil(t, result)
 }
@@ -100,7 +99,7 @@ func TestPtrIfNotEmpty_NonEmpty(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ptrIfNotEmpty(tc.input)
+			result := PtrIfNotEmpty(tc.input)
 
 			assert.NotNil(t, result)
 			assert.Equal(t, tc.input, *result)
@@ -109,16 +108,13 @@ func TestPtrIfNotEmpty_NonEmpty(t *testing.T) {
 }
 
 func TestPtrIfNotEmpty_ReturnsNewPointer(t *testing.T) {
-	// Verify that each call returns a new pointer
 	input := "test"
-	result1 := ptrIfNotEmpty(input)
-	result2 := ptrIfNotEmpty(input)
+	result1 := PtrIfNotEmpty(input)
+	result2 := PtrIfNotEmpty(input)
 
 	assert.NotNil(t, result1)
 	assert.NotNil(t, result2)
 	assert.Equal(t, *result1, *result2)
-	// Note: In Go, these may or may not be the same address depending on compiler optimizations
-	// The important thing is that the values are correct
 }
 
 func TestPtr_Struct(t *testing.T) {
@@ -128,7 +124,7 @@ func TestPtr_Struct(t *testing.T) {
 	}
 
 	input := TestStruct{Name: "test", Value: 42}
-	result := ptr(input)
+	result := Ptr(input)
 
 	assert.NotNil(t, result)
 	assert.Equal(t, input.Name, result.Name)
@@ -137,7 +133,7 @@ func TestPtr_Struct(t *testing.T) {
 
 func TestPtr_Slice(t *testing.T) {
 	input := []string{"a", "b", "c"}
-	result := ptr(input)
+	result := Ptr(input)
 
 	assert.NotNil(t, result)
 	assert.Equal(t, len(input), len(*result))
@@ -146,7 +142,7 @@ func TestPtr_Slice(t *testing.T) {
 
 func TestPtr_Map(t *testing.T) {
 	input := map[string]int{"one": 1, "two": 2}
-	result := ptr(input)
+	result := Ptr(input)
 
 	assert.NotNil(t, result)
 	assert.Equal(t, input["one"], (*result)["one"])

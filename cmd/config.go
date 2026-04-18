@@ -24,10 +24,7 @@ var configGetCmd = &cobra.Command{
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := utils.LoadConfig()
-		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "loading config")
 		fmt.Println("API Endpoint:", config.APIEndpoint)
 		fmt.Println("Timeout:", config.Timeout)
 
@@ -74,17 +71,11 @@ var configSetEndpointCmd = &cobra.Command{
 		endpoint := args[0]
 
 		config, err := utils.LoadConfig()
-		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "loading config")
 
 		config.APIEndpoint = endpoint
 
-		if err := utils.SaveConfig(config); err != nil {
-			fmt.Println("Error saving config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(utils.SaveConfig(config), "saving config")
 
 		fmt.Println("API endpoint set to:", endpoint)
 	},
@@ -105,17 +96,11 @@ var configSetTimeoutCmd = &cobra.Command{
 		}
 
 		config, err := utils.LoadConfig()
-		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "loading config")
 
 		config.Timeout = time.Duration(timeout) * time.Second
 
-		if err := utils.SaveConfig(config); err != nil {
-			fmt.Println("Error saving config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(utils.SaveConfig(config), "saving config")
 
 		fmt.Println("Timeout set to:", timeout, "seconds")
 	},
@@ -131,10 +116,7 @@ var configSetAPIKeyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKey := args[0]
 
-		if err := utils.SaveAPIKey(apiKey); err != nil {
-			fmt.Println("Error saving API key:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(utils.SaveAPIKey(apiKey), "saving API key")
 
 		fmt.Println("API key set successfully")
 	},
@@ -152,10 +134,7 @@ var configSetOAuthCmd = &cobra.Command{
 		scope, _ := cmd.Flags().GetString("scope")
 
 		config, err := utils.LoadConfig()
-		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "loading config")
 
 		// Initialize OAuth config if it doesn't exist
 		if config.OAuth == nil {
@@ -167,10 +146,7 @@ var configSetOAuthCmd = &cobra.Command{
 		config.OAuth.ClientSecret = clientSecret
 		config.OAuth.Scope = scope
 
-		if err := utils.SaveConfig(config); err != nil {
-			fmt.Println("Error saving config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(utils.SaveConfig(config), "saving config")
 
 		fmt.Println("OAuth credentials configured successfully")
 		fmt.Println("Client ID:", clientID)
@@ -187,19 +163,13 @@ var configDisableOAuthCmd = &cobra.Command{
 	Long:  `Disable OAuth authentication and fall back to API key`,
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := utils.LoadConfig()
-		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "loading config")
 
 		if config.OAuth != nil {
 			config.OAuth.Enabled = false
 		}
 
-		if err := utils.SaveConfig(config); err != nil {
-			fmt.Println("Error saving config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(utils.SaveConfig(config), "saving config")
 
 		fmt.Println("OAuth authentication disabled")
 	},
@@ -212,10 +182,7 @@ var configTestOAuthCmd = &cobra.Command{
 	Long:  `Test OAuth authentication by getting a token`,
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := utils.LoadConfig()
-		if err != nil {
-			fmt.Println("Error loading config:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "loading config")
 
 		if config.OAuth == nil || !config.OAuth.Enabled {
 			fmt.Println("OAuth is not enabled. Use 'proof config set-oauth' to configure OAuth credentials.")
@@ -224,17 +191,11 @@ var configTestOAuthCmd = &cobra.Command{
 
 		// Create a client to test OAuth (this will automatically attempt OAuth)
 		client, err := utils.NewProofClient()
-		if err != nil {
-			fmt.Println("OAuth authentication failed:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "OAuth authentication failed")
 
 		// Test OAuth by forcing a token refresh through the client
 		token, err := client.TestOAuthAuthentication()
-		if err != nil {
-			fmt.Println("OAuth authentication failed:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "OAuth authentication failed")
 
 		fmt.Println("OAuth authentication successful!")
 		fmt.Println("Token Type:", token.TokenType)

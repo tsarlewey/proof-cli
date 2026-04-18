@@ -5,24 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
+	"github.com/tsarlewey/proof-cli/pkg/utils"
 )
-
-// ptr returns a pointer to the given value (helper for optional SDK fields)
-func ptr[T any](v T) *T {
-	return &v
-}
-
-// ptrIfNotEmpty returns a pointer to the string if non-empty, otherwise nil
-func ptrIfNotEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
 
 // businessCmd represents the business command
 var businessCmd = &cobra.Command{
@@ -56,42 +43,23 @@ var bizListTransactionsCmd = &cobra.Command{
 
 		// Build query parameters
 		params := &business.GetAllTransactionsParams{
-			Limit:              ptr(limit),
-			Offset:             ptr(offset),
-			DocumentUrlVersion: ptr(business.GetAllTransactionsParamsDocumentUrlVersionV2),
+			Limit:              utils.Ptr(limit),
+			Offset:             utils.Ptr(offset),
+			DocumentUrlVersion: utils.Ptr(business.GetAllTransactionsParamsDocumentUrlVersionV2),
 		}
 
 		// Parse status if provided
 		if status != "" {
-			params.TransactionStatus = ptr(business.GetAllTransactionsParamsTransactionStatus(status))
+			params.TransactionStatus = utils.Ptr(business.GetAllTransactionsParamsTransactionStatus(status))
 		}
 
-		// Parse date filters if provided
-		if dateStart != "" {
-			t, err := time.Parse("2006-01-02", dateStart)
-			if err != nil {
-				fmt.Printf("Error parsing created-start date: %v\n", err)
-				os.Exit(1)
-			}
-			params.CreatedDateStart = &t
-		}
-
-		if dateEnd != "" {
-			t, err := time.Parse("2006-01-02", dateEnd)
-			if err != nil {
-				fmt.Printf("Error parsing created-end date: %v\n", err)
-				os.Exit(1)
-			}
-			params.CreatedDateEnd = &t
-		}
+		params.CreatedDateStart = parseDateFlag("created-start date", dateStart, "2006-01-02")
+		params.CreatedDateEnd = parseDateFlag("created-end date", dateEnd, "2006-01-02")
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.GetAllTransactionsWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error fetching transactions:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "fetching transactions")
 
 		PrintResponse(resp.Body)
 	},
@@ -108,16 +76,13 @@ var bizGetTransactionCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &business.GetTransactionParams{
-			DocumentUrlVersion: ptr(business.GetTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.GetTransactionParamsDocumentUrlVersionV2),
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.GetTransactionWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error fetching transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "fetching transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -146,39 +111,33 @@ var bizCreateTransactionCmd = &cobra.Command{
 
 		// Read the document file
 		documentData, err := os.ReadFile(documentPath)
-		if err != nil {
-			fmt.Println("Error reading document file:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "reading document file")
 
 		// Encode document to base64
 		documentBase64 := base64.StdEncoding.EncodeToString(documentData)
 
 		// Build query parameters
 		queryParams := &business.CreateTransactionParams{
-			DocumentUrlVersion: ptr(business.CreateTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.CreateTransactionParamsDocumentUrlVersionV2),
 		}
 
 		// Build request body
 		body := business.CreateTransactionJSONRequestBody{
 			Signer: business.Signer{
 				Email:     email,
-				FirstName: ptrIfNotEmpty(firstName),
-				LastName:  ptrIfNotEmpty(lastName),
+				FirstName: utils.PtrIfNotEmpty(firstName),
+				LastName:  utils.PtrIfNotEmpty(lastName),
 			},
-			Documents:       ptr([]string{documentBase64}),
-			Draft:           ptr(draft),
-			TransactionName: ptrIfNotEmpty(transactionName),
-			TransactionType: ptrIfNotEmpty(transactionType),
+			Documents:       utils.Ptr([]string{documentBase64}),
+			Draft:           utils.Ptr(draft),
+			TransactionName: utils.PtrIfNotEmpty(transactionName),
+			TransactionType: utils.PtrIfNotEmpty(transactionType),
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.CreateTransactionWithResponse(context.Background(), queryParams, body)
-		if err != nil {
-			fmt.Println("Error creating transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -196,12 +155,9 @@ var bizDeleteTransactionCmd = &cobra.Command{
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.DeleteTransactionWithResponse(context.Background(), transactionID)
-		if err != nil {
-			fmt.Println("Error deleting transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "deleting transaction")
 
-		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Transaction deleted successfully")
 		}
 		PrintVerbose(string(resp.Body))
@@ -218,16 +174,13 @@ var bizActivateTransactionCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &business.ActivateDraftTransactionParams{
-			DocumentUrlVersion: ptr(business.ActivateDraftTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.ActivateDraftTransactionParamsDocumentUrlVersionV2),
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.ActivateDraftTransactionWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error activating transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "activating transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -244,19 +197,16 @@ var bizRecallTransactionCmd = &cobra.Command{
 		recallReason, _ := cmd.Flags().GetString("reason")
 
 		params := &business.RecallTransactionParams{
-			DocumentUrlVersion: ptr(business.RecallTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.RecallTransactionParamsDocumentUrlVersionV2),
 		}
 		if recallReason != "" {
-			params.RecallReason = ptr(recallReason)
+			params.RecallReason = utils.Ptr(recallReason)
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.RecallTransactionWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error recalling transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "recalling transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -273,19 +223,16 @@ var bizResendEmailCmd = &cobra.Command{
 		messageToSigner, _ := cmd.Flags().GetString("message")
 
 		params := &business.ResendTransactionEmailParams{
-			DocumentUrlVersion: ptr(business.ResendTransactionEmailParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.ResendTransactionEmailParamsDocumentUrlVersionV2),
 		}
 		if messageToSigner != "" {
-			params.MessageToSigner = ptr(messageToSigner)
+			params.MessageToSigner = utils.Ptr(messageToSigner)
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.ResendTransactionEmailWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error resending email:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "resending email")
 
 		PrintResponse(resp.Body)
 	},
@@ -302,19 +249,16 @@ var bizResendSMSCmd = &cobra.Command{
 		phoneNumber, _ := cmd.Flags().GetString("phone-number")
 
 		params := &business.ResendTransactionSMSParams{
-			DocumentUrlVersion: ptr(business.ResendTransactionSMSParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.ResendTransactionSMSParamsDocumentUrlVersionV2),
 		}
 		if phoneNumber != "" {
-			params.PhoneNumber = ptr(phoneNumber)
+			params.PhoneNumber = utils.Ptr(phoneNumber)
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.ResendTransactionSMSWithResponse(context.Background(), transactionID, params, business.ResendTransactionSMSJSONRequestBody{})
-		if err != nil {
-			fmt.Println("Error resending SMS:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "resending SMS")
 
 		PrintResponse(resp.Body)
 	},
@@ -332,10 +276,7 @@ var bizGetEligibleNotariesCmd = &cobra.Command{
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.GetAllEligibleNotariesWithResponse(context.Background(), transactionID)
-		if err != nil {
-			fmt.Println("Error getting eligible notaries:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting eligible notaries")
 
 		PrintResponse(resp.Body)
 	},
@@ -377,48 +318,42 @@ var bizAddDocumentCmd = &cobra.Command{
 
 		// Read the file
 		fileContent, err := os.ReadFile(filePath)
-		if err != nil {
-			fmt.Println("Error reading file:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "reading file")
 
 		// Encode document to base64
 		documentBase64 := base64.StdEncoding.EncodeToString(fileContent)
 
 		// Build query parameters
 		queryParams := &business.AddDocumentParams{
-			DocumentUrlVersion: ptr(business.AddDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.AddDocumentParamsDocumentUrlVersionV2),
 		}
 
 		// Build request body
 		body := business.AddDocumentJSONRequestBody{
-			Resource:                     ptr(documentBase64),
-			Filename:                     ptrIfNotEmpty(filename),
-			NotarizationRequired:         ptr(notarizationRequired),
-			WitnessRequired:              ptr(witnessRequired),
-			EsignRequired:                ptr(esignRequired),
-			IdentityConfirmationRequired: ptr(identityConfirmationRequired),
-			SigningRequiresMeeting:       ptr(signingRequiresMeeting),
-			Vaulted:                      ptr(vaulted),
-			CustomerCanAnnotate:          ptr(customerCanAnnotate),
-			PdfBookmarked:                ptr(pdfBookmarked),
-			TrackingId:                   ptrIfNotEmpty(trackingID),
-			TextTagSyntax:                ptrIfNotEmpty(textTagSyntax),
-			Requirement:                  ptrIfNotEmpty(requirement),
-			AuthorizationHeader:          ptrIfNotEmpty(authorizationHeader),
+			Resource:                     utils.Ptr(documentBase64),
+			Filename:                     utils.PtrIfNotEmpty(filename),
+			NotarizationRequired:         utils.Ptr(notarizationRequired),
+			WitnessRequired:              utils.Ptr(witnessRequired),
+			EsignRequired:                utils.Ptr(esignRequired),
+			IdentityConfirmationRequired: utils.Ptr(identityConfirmationRequired),
+			SigningRequiresMeeting:       utils.Ptr(signingRequiresMeeting),
+			Vaulted:                      utils.Ptr(vaulted),
+			CustomerCanAnnotate:          utils.Ptr(customerCanAnnotate),
+			PdfBookmarked:                utils.Ptr(pdfBookmarked),
+			TrackingId:                   utils.PtrIfNotEmpty(trackingID),
+			TextTagSyntax:                utils.PtrIfNotEmpty(textTagSyntax),
+			Requirement:                  utils.PtrIfNotEmpty(requirement),
+			AuthorizationHeader:          utils.PtrIfNotEmpty(authorizationHeader),
 		}
 
 		if bundlePosition > 0 {
-			body.BundlePosition = ptr(bundlePosition)
+			body.BundlePosition = utils.Ptr(bundlePosition)
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.AddDocumentWithResponse(context.Background(), transactionID, queryParams, body)
-		if err != nil {
-			fmt.Println("Error adding document:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "adding document")
 
 		PrintResponse(resp.Body)
 	},
@@ -437,19 +372,16 @@ var bizGetDocumentCmd = &cobra.Command{
 		encoding, _ := cmd.Flags().GetString("encoding")
 
 		params := &business.GetDocumentParams{
-			DocumentUrlVersion: ptr(business.GetDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.GetDocumentParamsDocumentUrlVersionV2),
 		}
 		if encoding != "" {
-			params.Encoding = ptr(encoding)
+			params.Encoding = utils.Ptr(encoding)
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.GetDocumentWithResponse(context.Background(), transactionID, documentID, params)
-		if err != nil {
-			fmt.Println("Error fetching document:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "fetching document")
 
 		PrintResponse(resp.Body)
 	},
@@ -467,12 +399,9 @@ var bizDeleteDocumentCmd = &cobra.Command{
 		// Make API call using SDK
 		client := getBusinessClient()
 		resp, err := client.DeleteDocumentWithResponse(context.Background(), documentID)
-		if err != nil {
-			fmt.Println("Error deleting document:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "deleting document")
 
-		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Document deleted successfully")
 		}
 		PrintVerbose(string(resp.Body))
@@ -497,10 +426,7 @@ var bizGetWebhookCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.GetWebhookURLWithResponse(context.Background())
-		if err != nil {
-			fmt.Println("Error getting webhook:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting webhook")
 
 		PrintResponse(resp.Body)
 	},
@@ -516,10 +442,7 @@ var bizListWebhooksCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.GetAllWebhooksV2WithResponse(context.Background())
-		if err != nil {
-			fmt.Println("Error listing webhooks:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "listing webhooks")
 
 		PrintResponse(resp.Body)
 	},
@@ -538,10 +461,7 @@ var bizGetWebhookV2Cmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.GetWebhookV2WithResponse(context.Background(), webhookID)
-		if err != nil {
-			fmt.Println("Error getting webhook v2:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting webhook v2")
 
 		PrintResponse(resp.Body)
 	},
@@ -567,17 +487,14 @@ var bizCreateWebhookCmd = &cobra.Command{
 			Subscriptions: events,
 		}
 		if header != "" {
-			body.Header = ptr(header)
+			body.Header = utils.Ptr(header)
 		}
 
 		PrintVerbose("Creating webhook v2 with URL: " + url)
 
 		client := getBusinessClient()
 		resp, err := client.CreateWebhookV2WithResponse(context.Background(), body)
-		if err != nil {
-			fmt.Println("Error creating webhook v2:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating webhook v2")
 
 		PrintResponse(resp.Body)
 	},
@@ -602,17 +519,14 @@ var bizUpdateWebhookCmd = &cobra.Command{
 			Subscriptions: events,
 		}
 		if header != "" {
-			body.Header = ptr(header)
+			body.Header = utils.Ptr(header)
 		}
 
 		PrintVerbose("Updating webhook v2: " + webhookID)
 
 		client := getBusinessClient()
 		resp, err := client.UpdateWebhookV2WithResponse(context.Background(), webhookID, body)
-		if err != nil {
-			fmt.Println("Error updating webhook v2:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "updating webhook v2")
 
 		PrintResponse(resp.Body)
 	},
@@ -631,12 +545,9 @@ var bizDeleteWebhookCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.DeleteWebhookV2WithResponse(context.Background(), webhookID)
-		if err != nil {
-			fmt.Println("Error deleting webhook v2:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "deleting webhook v2")
 
-		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Webhook v2 deleted successfully")
 		}
 	},
@@ -655,10 +566,7 @@ var bizGetWebhookEventsCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.GetWebhookEventsV2WithResponse(context.Background(), webhookID, nil)
-		if err != nil {
-			fmt.Println("Error getting webhook v2 events:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting webhook v2 events")
 
 		PrintResponse(resp.Body)
 	},
@@ -674,10 +582,7 @@ var bizGetWebhookSubscriptionsCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.GetWebhookSubscriptionsV2WithResponse(context.Background())
-		if err != nil {
-			fmt.Println("Error getting webhook v2 subscriptions:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting webhook v2 subscriptions")
 
 		PrintResponse(resp.Body)
 	},
@@ -701,20 +606,17 @@ var bizListNotariesCmd = &cobra.Command{
 
 		params := &business.GetAllNotariesParams{}
 		if orgID != "" {
-			params.OrganizationId = ptr(orgID)
+			params.OrganizationId = utils.Ptr(orgID)
 		}
 		if state != "" {
-			params.UsStateAbbr = ptr(state)
+			params.UsStateAbbr = utils.Ptr(state)
 		}
 
 		PrintVerbose("Fetching notaries")
 
 		client := getBusinessClient()
 		resp, err := client.GetAllNotariesWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error listing notaries:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "listing notaries")
 
 		PrintResponse(resp.Body)
 	},
@@ -733,10 +635,7 @@ var bizGetNotaryCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.GetNotaryWithResponse(context.Background(), notaryID)
-		if err != nil {
-			fmt.Println("Error getting notary:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting notary")
 
 		PrintResponse(resp.Body)
 	},
@@ -766,17 +665,14 @@ var bizCreateNotaryCmd = &cobra.Command{
 			UsStateAbbr: state,
 		}
 		if middleName != "" {
-			body.MiddleName = ptr(middleName)
+			body.MiddleName = utils.Ptr(middleName)
 		}
 
 		PrintVerbose(fmt.Sprintf("Creating notary with email: %s", email))
 
 		client := getBusinessClient()
 		resp, err := client.CreateNotaryWithResponse(context.Background(), body)
-		if err != nil {
-			fmt.Println("Error creating notary:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating notary")
 
 		PrintResponse(resp.Body)
 	},
@@ -795,12 +691,9 @@ var bizDeleteNotaryCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.DeleteNotaryWithResponse(context.Background(), notaryID)
-		if err != nil {
-			fmt.Println("Error deleting notary:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "deleting notary")
 
-		if resp.StatusCode() >= 200 && resp.StatusCode() < 300 {
+		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Notary deleted successfully")
 		}
 	},
@@ -824,20 +717,17 @@ var bizListTemplatesCmd = &cobra.Command{
 
 		params := &business.GetAllTemplatesParams{}
 		if limit > 0 {
-			params.Limit = ptr(limit)
+			params.Limit = utils.Ptr(limit)
 		}
 		if offset > 0 {
-			params.Offset = ptr(offset)
+			params.Offset = utils.Ptr(offset)
 		}
 
 		PrintVerbose("Fetching templates")
 
 		client := getBusinessClient()
 		resp, err := client.GetAllTemplatesWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error listing templates:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "listing templates")
 
 		PrintResponse(resp.Body)
 	},
@@ -869,18 +759,15 @@ var bizCreateReferralCmd = &cobra.Command{
 
 		body := business.CreateReferralJSONRequestBody{
 			Name:           name,
-			CoverPayment:   ptr(coverPayment),
-			OrganizationId: ptrIfNotEmpty(organizationID),
-			RedirectUrl:    ptrIfNotEmpty(redirectURL),
-			UseBranding:    ptr(useBranding),
+			CoverPayment:   utils.Ptr(coverPayment),
+			OrganizationId: utils.PtrIfNotEmpty(organizationID),
+			RedirectUrl:    utils.PtrIfNotEmpty(redirectURL),
+			UseBranding:    utils.Ptr(useBranding),
 		}
 
 		client := getBusinessClient()
 		resp, err := client.CreateReferralWithResponse(context.Background(), body)
-		if err != nil {
-			fmt.Println("Error creating referral campaign:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating referral campaign")
 
 		PrintResponse(resp.Body)
 	},
@@ -898,15 +785,12 @@ var bizGenerateReferralCodeCmd = &cobra.Command{
 
 		body := business.GenerateReferralCodeJSONRequestBody{}
 		if expiresAt != "" {
-			body.ExpiresAt = ptr(expiresAt)
+			body.ExpiresAt = utils.Ptr(expiresAt)
 		}
 
 		client := getBusinessClient()
 		resp, err := client.GenerateReferralCodeWithResponse(context.Background(), referralCampaignID, body)
-		if err != nil {
-			fmt.Println("Error generating referral code:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "generating referral code")
 
 		PrintResponse(resp.Body)
 	},
@@ -948,8 +832,8 @@ var bizCreateIntegrationCmd = &cobra.Command{
 		}
 
 		body := business.CreateIntegrationJSONRequestBody{
-			Name:           ptr(integrationName),
-			OrganizationId: ptr(orgID),
+			Name:           utils.Ptr(integrationName),
+			OrganizationId: utils.Ptr(orgID),
 		}
 
 		// Add configuration if provided
@@ -958,8 +842,8 @@ var bizCreateIntegrationCmd = &cobra.Command{
 				AccountId   *string `json:"account_id,omitempty"`
 				Environment *string `json:"environment,omitempty"`
 			}{
-				AccountId:   ptrIfNotEmpty(accountID),
-				Environment: ptrIfNotEmpty(environment),
+				AccountId:   utils.PtrIfNotEmpty(accountID),
+				Environment: utils.PtrIfNotEmpty(environment),
 			}
 		}
 
@@ -967,10 +851,7 @@ var bizCreateIntegrationCmd = &cobra.Command{
 
 		client := getBusinessClient()
 		resp, err := client.CreateIntegrationWithResponse(context.Background(), body)
-		if err != nil {
-			fmt.Println("Error creating integration:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating integration")
 
 		PrintResponse(resp.Body)
 	},

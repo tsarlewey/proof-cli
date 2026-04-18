@@ -77,96 +77,87 @@ func TestNewClientWithResponses(t *testing.T) {
 	assert.NotNil(t, client)
 }
 
-// Note: SCIM SDK has confusingly named methods due to poor operationIds in the OpenAPI spec.
-// The mapping is:
-// - RetrieveResourceTypesCopy: List Users (GET)
-// - CreateUserCopy: Get User (GET)
-// - CreateUserCopy1: Update User (PUT)
-// - ReplaceUserCopy: Patch User (PATCH)
-// - ReplaceUserCopy1: Delete User (DELETE)
-// - RetrieveUsersSchemaCopy: Get Resource Types (GET)
-
-// TestNewRetrieveResourceTypesCopyRequest verifies list users request generation
-func TestNewRetrieveResourceTypesCopyRequest(t *testing.T) {
+// TestNewListUsersRequest verifies list users request generation
+func TestNewListUsersRequest(t *testing.T) {
 	t.Run("generates request without params", func(t *testing.T) {
-		req, err := NewRetrieveResourceTypesCopyRequest("https://api.example.com/", "org-123", nil)
+		req, err := NewListUsersRequest("https://api.example.com/", "org-123", nil)
 		require.NoError(t, err)
 		assert.Equal(t, "GET", req.Method)
 		assert.Contains(t, req.URL.Path, "/org-123/Users")
 	})
 
 	t.Run("includes startIndex parameter", func(t *testing.T) {
-		params := &RetrieveResourceTypesCopyParams{
+		params := &ListUsersParams{
 			StartIndex: ptr(int32(1)),
 		}
-		req, err := NewRetrieveResourceTypesCopyRequest("https://api.example.com/", "org-123", params)
+		req, err := NewListUsersRequest("https://api.example.com/", "org-123", params)
 		require.NoError(t, err)
 		assert.Contains(t, req.URL.RawQuery, "startIndex=1")
 	})
 
 	t.Run("includes count parameter", func(t *testing.T) {
-		params := &RetrieveResourceTypesCopyParams{
+		params := &ListUsersParams{
 			Count: ptr(int32(50)),
 		}
-		req, err := NewRetrieveResourceTypesCopyRequest("https://api.example.com/", "org-123", params)
+		req, err := NewListUsersRequest("https://api.example.com/", "org-123", params)
 		require.NoError(t, err)
 		assert.Contains(t, req.URL.RawQuery, "count=50")
 	})
 
 	t.Run("includes filter parameter", func(t *testing.T) {
-		params := &RetrieveResourceTypesCopyParams{
+		params := &ListUsersParams{
 			Filter: ptr(`userName eq "test@example.com"`),
 		}
-		req, err := NewRetrieveResourceTypesCopyRequest("https://api.example.com/", "org-123", params)
+		req, err := NewListUsersRequest("https://api.example.com/", "org-123", params)
 		require.NoError(t, err)
 		assert.Contains(t, req.URL.RawQuery, "filter=")
 	})
 
 	t.Run("includes multiple parameters", func(t *testing.T) {
-		params := &RetrieveResourceTypesCopyParams{
+		params := &ListUsersParams{
 			StartIndex: ptr(int32(1)),
 			Count:      ptr(int32(100)),
 		}
-		req, err := NewRetrieveResourceTypesCopyRequest("https://api.example.com/", "org-123", params)
+		req, err := NewListUsersRequest("https://api.example.com/", "org-123", params)
 		require.NoError(t, err)
 		assert.Contains(t, req.URL.RawQuery, "startIndex=1")
 		assert.Contains(t, req.URL.RawQuery, "count=100")
 	})
 }
 
-// TestNewCreateUserCopyRequest verifies get user request generation (confusing name due to bad operationId)
-func TestNewCreateUserCopyRequest(t *testing.T) {
+// TestNewGetUserRequest verifies get user request generation
+func TestNewGetUserRequest(t *testing.T) {
 	t.Run("generates GET request for specific user", func(t *testing.T) {
-		req, err := NewCreateUserCopyRequest("https://api.example.com/", "org-123", "user-456", nil)
+		req, err := NewGetUserRequest("https://api.example.com/", "org-123", "user-456", nil)
 		require.NoError(t, err)
 		assert.Equal(t, "GET", req.Method)
 		assert.Contains(t, req.URL.Path, "/org-123/Users/user-456")
 	})
 
 	t.Run("includes accept header parameter", func(t *testing.T) {
-		params := &CreateUserCopyParams{
+		params := &GetUserParams{
 			Accept: ptr("application/json"),
 		}
-		req, err := NewCreateUserCopyRequest("https://api.example.com/", "org-123", "user-456", params)
+		req, err := NewGetUserRequest("https://api.example.com/", "org-123", "user-456", params)
 		require.NoError(t, err)
 		assert.Equal(t, "application/json", req.Header.Get("accept"))
 	})
 }
 
-// TestNewReplaceUserCopy1Request verifies delete user request generation (confusing name due to bad operationId)
-func TestNewReplaceUserCopy1Request(t *testing.T) {
+// TestNewDeleteUserRequest verifies delete user request generation
+func TestNewDeleteUserRequest(t *testing.T) {
 	t.Run("generates DELETE request for user", func(t *testing.T) {
-		req, err := NewReplaceUserCopy1Request("https://api.example.com/", "org-123", "user-456", nil)
+		req, err := NewDeleteUserRequest("https://api.example.com/", "org-123", "user-456", nil)
 		require.NoError(t, err)
 		assert.Equal(t, "DELETE", req.Method)
 		assert.Contains(t, req.URL.Path, "/org-123/Users/user-456")
 	})
 }
 
-// TestNewReplaceUserCopyRequest verifies patch user request generation (confusing name due to bad operationId)
-func TestNewReplaceUserCopyRequest(t *testing.T) {
+// TestNewPatchUserRequest verifies patch user request generation
+func TestNewPatchUserRequest(t *testing.T) {
 	t.Run("generates PATCH request for user", func(t *testing.T) {
-		body := ReplaceUserCopyJSONRequestBody{
+		body := PatchUserJSONRequestBody{
 			Operations: struct {
 				Op    string  `json:"op"`
 				Path  *string `json:"path,omitempty"`
@@ -177,7 +168,7 @@ func TestNewReplaceUserCopyRequest(t *testing.T) {
 				Value: ptr("false"),
 			},
 		}
-		req, err := NewReplaceUserCopyRequest("https://api.example.com/", "org-123", "user-456", nil, body)
+		req, err := NewPatchUserRequest("https://api.example.com/", "org-123", "user-456", nil, body)
 		require.NoError(t, err)
 		assert.Equal(t, "PATCH", req.Method)
 		assert.Contains(t, req.URL.Path, "/org-123/Users/user-456")
@@ -207,7 +198,7 @@ func TestNewCreateUserRequest(t *testing.T) {
 	})
 }
 
-// TestNewRetrieveUsersSchemaRequest verifies schema retrieval request generation
+// TestNewRetrieveUsersSchemaRequest verifies user schema retrieval
 func TestNewRetrieveUsersSchemaRequest(t *testing.T) {
 	t.Run("generates request for user schema", func(t *testing.T) {
 		req, err := NewRetrieveUsersSchemaRequest("https://api.example.com/", "org-123")
@@ -217,73 +208,115 @@ func TestNewRetrieveUsersSchemaRequest(t *testing.T) {
 	})
 }
 
-// TestNewRetrieveServiceProviderConfigCopyRequest verifies resource types retrieval
-func TestNewRetrieveServiceProviderConfigCopyRequest(t *testing.T) {
+// TestNewGetResourceTypesRequest verifies resource types retrieval
+func TestNewGetResourceTypesRequest(t *testing.T) {
 	t.Run("generates request for resource types", func(t *testing.T) {
-		req, err := NewRetrieveServiceProviderConfigCopyRequest("https://api.example.com/", "org-123")
+		req, err := NewGetResourceTypesRequest("https://api.example.com/", "org-123")
 		require.NoError(t, err)
 		assert.Equal(t, "GET", req.Method)
 		assert.Contains(t, req.URL.Path, "/org-123/ResourceTypes")
 	})
 }
 
-// TestNewRetrieveUsersSchemaCopyRequest verifies service provider config retrieval
-func TestNewRetrieveUsersSchemaCopyRequest(t *testing.T) {
+// TestNewGetServiceProviderConfigRequest verifies service provider config retrieval
+func TestNewGetServiceProviderConfigRequest(t *testing.T) {
 	t.Run("generates request for service provider config", func(t *testing.T) {
-		req, err := NewRetrieveUsersSchemaCopyRequest("https://api.example.com/", "org-123")
+		req, err := NewGetServiceProviderConfigRequest("https://api.example.com/", "org-123")
 		require.NoError(t, err)
 		assert.Equal(t, "GET", req.Method)
 		assert.Contains(t, req.URL.Path, "/org-123/ServiceProviderConfig")
 	})
 }
 
-// TestParseRetrieveResourceTypesCopyResponse verifies list users response parsing
-func TestParseRetrieveResourceTypesCopyResponse(t *testing.T) {
-	t.Run("parses 200 response", func(t *testing.T) {
-		body := struct {
-			Resources    []interface{} `json:"Resources"`
-			TotalResults int           `json:"totalResults"`
-		}{
-			Resources:    []interface{}{},
-			TotalResults: 0,
+// TestParseListUsersResponse verifies list users response parsing — payload
+// fields are asserted (not just the status code) so a parser that silently
+// dropped them would fail the test.
+func TestParseListUsersResponse(t *testing.T) {
+	t.Run("deserializes 200 payload fields", func(t *testing.T) {
+		rawJSON := []byte(`{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+			"totalResults": 2,
+			"itemsPerPage": 50,
+			"startIndex": 1,
+			"Resources": [
+				{
+					"id": "user-1",
+					"userName": "alice@example.com",
+					"active": true,
+					"name": {"givenName": "Alice", "familyName": "Smith"},
+					"emails": [{"value": "alice@example.com", "primary": true}],
+					"roles": [{"value": "admin", "display": "Admin"}]
+				},
+				{
+					"id": "user-2",
+					"userName": "bob@example.com",
+					"active": false
+				}
+			]
+		}`)
+		resp := &http.Response{
+			StatusCode: 200,
+			Status:     "200 OK",
+			Body:       io.NopCloser(bytes.NewReader(rawJSON)),
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
 		}
-		resp := mockJSONResponse(200, body)
 
-		parsed, err := ParseRetrieveResourceTypesCopyResponse(resp)
+		parsed, err := ParseListUsersResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 200, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON200)
+		require.NotNil(t, parsed.JSON200)
+
+		assert.Equal(t, 2, *parsed.JSON200.TotalResults)
+		assert.Equal(t, 50, *parsed.JSON200.ItemsPerPage)
+		assert.Equal(t, 1, *parsed.JSON200.StartIndex)
+
+		require.NotNil(t, parsed.JSON200.Resources)
+		require.Len(t, *parsed.JSON200.Resources, 2)
+
+		alice := (*parsed.JSON200.Resources)[0]
+		assert.Equal(t, "user-1", *alice.Id)
+		assert.Equal(t, "alice@example.com", *alice.UserName)
+		assert.True(t, *alice.Active)
+		require.NotNil(t, alice.Name)
+		assert.Equal(t, "Alice", *alice.Name.GivenName)
+		assert.Equal(t, "Smith", *alice.Name.FamilyName)
+		require.NotNil(t, alice.Emails)
+		require.Len(t, *alice.Emails, 1)
+		assert.Equal(t, "alice@example.com", *(*alice.Emails)[0].Value)
+		assert.True(t, *(*alice.Emails)[0].Primary)
+
+		bob := (*parsed.JSON200.Resources)[1]
+		assert.Equal(t, "bob@example.com", *bob.UserName)
+		assert.False(t, *bob.Active)
+
+		// Body bytes are preserved so callers that PrintResponse() see the raw JSON.
+		assert.Contains(t, string(parsed.Body), `"alice@example.com"`)
 	})
 
-	t.Run("parses 403 error response", func(t *testing.T) {
-		body := struct {
+	t.Run("deserializes 403 errors", func(t *testing.T) {
+		resp := mockJSONResponse(403, struct {
 			Errors []string `json:"errors"`
-		}{
-			Errors: []string{"Access denied"},
-		}
-		resp := mockJSONResponse(403, body)
+		}{Errors: []string{"Access denied"}})
 
-		parsed, err := ParseRetrieveResourceTypesCopyResponse(resp)
+		parsed, err := ParseListUsersResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 403, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON403)
+		require.NotNil(t, parsed.JSON403)
+		require.NotNil(t, parsed.JSON403.Errors)
+		assert.Equal(t, []string{"Access denied"}, *parsed.JSON403.Errors)
 	})
 
-	t.Run("parses 404 error response", func(t *testing.T) {
-		body := struct {
+	t.Run("deserializes 404 errors", func(t *testing.T) {
+		resp := mockJSONResponse(404, struct {
 			Errors []string `json:"errors"`
-		}{
-			Errors: []string{"Not found"},
-		}
-		resp := mockJSONResponse(404, body)
+		}{Errors: []string{"Not found"}})
 
-		parsed, err := ParseRetrieveResourceTypesCopyResponse(resp)
+		parsed, err := ParseListUsersResponse(resp)
 		require.NoError(t, err)
-		assert.Equal(t, 404, parsed.StatusCode())
-		assert.NotNil(t, parsed.JSON404)
+		require.NotNil(t, parsed.JSON404)
+		require.NotNil(t, parsed.JSON404.Errors)
+		assert.Equal(t, []string{"Not found"}, *parsed.JSON404.Errors)
 	})
 
-	t.Run("handles empty response body", func(t *testing.T) {
+	t.Run("empty body yields nil JSON200 without error", func(t *testing.T) {
 		resp := &http.Response{
 			StatusCode: 204,
 			Status:     http.StatusText(204),
@@ -291,112 +324,11 @@ func TestParseRetrieveResourceTypesCopyResponse(t *testing.T) {
 			Header:     http.Header{},
 		}
 
-		parsed, err := ParseRetrieveResourceTypesCopyResponse(resp)
+		parsed, err := ParseListUsersResponse(resp)
 		require.NoError(t, err)
 		assert.Equal(t, 204, parsed.StatusCode())
+		assert.Nil(t, parsed.JSON200)
 	})
-}
-
-// TestResponseStatusMethods verifies status methods on response types
-func TestResponseStatusMethods(t *testing.T) {
-	testCases := []struct {
-		name     string
-		testFunc func(t *testing.T)
-	}{
-		{
-			name: "RetrieveResourceTypesCopyResponse",
-			testFunc: func(t *testing.T) {
-				resp := &RetrieveResourceTypesCopyResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &RetrieveResourceTypesCopyResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-				assert.Equal(t, http.StatusText(0), nilResp.Status())
-			},
-		},
-		{
-			name: "CreateUserCopyResponse",
-			testFunc: func(t *testing.T) {
-				resp := &CreateUserCopyResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &CreateUserCopyResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "ReplaceUserCopy1Response (Delete User)",
-			testFunc: func(t *testing.T) {
-				resp := &ReplaceUserCopy1Response{HTTPResponse: &http.Response{StatusCode: 204, Status: "204 No Content"}}
-				assert.Equal(t, 204, resp.StatusCode())
-				assert.Equal(t, "204 No Content", resp.Status())
-
-				nilResp := &ReplaceUserCopy1Response{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "ReplaceUserCopyResponse (Patch User)",
-			testFunc: func(t *testing.T) {
-				resp := &ReplaceUserCopyResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &ReplaceUserCopyResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "CreateUserResponse",
-			testFunc: func(t *testing.T) {
-				resp := &CreateUserResponse{HTTPResponse: &http.Response{StatusCode: 201, Status: "201 Created"}}
-				assert.Equal(t, 201, resp.StatusCode())
-				assert.Equal(t, "201 Created", resp.Status())
-
-				nilResp := &CreateUserResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "RetrieveUsersSchemaResponse",
-			testFunc: func(t *testing.T) {
-				resp := &RetrieveUsersSchemaResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &RetrieveUsersSchemaResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "RetrieveServiceProviderConfigCopyResponse",
-			testFunc: func(t *testing.T) {
-				resp := &RetrieveServiceProviderConfigCopyResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &RetrieveServiceProviderConfigCopyResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-		{
-			name: "RetrieveUsersSchemaCopyResponse",
-			testFunc: func(t *testing.T) {
-				resp := &RetrieveUsersSchemaCopyResponse{HTTPResponse: &http.Response{StatusCode: 200, Status: "200 OK"}}
-				assert.Equal(t, 200, resp.StatusCode())
-				assert.Equal(t, "200 OK", resp.Status())
-
-				nilResp := &RetrieveUsersSchemaCopyResponse{}
-				assert.Equal(t, 0, nilResp.StatusCode())
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.testFunc)
-	}
 }
 
 // TestClientWithResponsesMethods verifies client with responses wrapper methods
@@ -413,8 +345,8 @@ func TestClientWithResponsesMethods(t *testing.T) {
 		WithHTTPClient(&http.Client{Transport: mockRT}))
 	require.NoError(t, err)
 
-	t.Run("RetrieveResourceTypesCopyWithResponse", func(t *testing.T) {
-		resp, err := client.RetrieveResourceTypesCopyWithResponse(context.Background(), "org-123", nil)
+	t.Run("ListUsersWithResponse", func(t *testing.T) {
+		resp, err := client.ListUsersWithResponse(context.Background(), "org-123", nil)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, 200, resp.StatusCode())
@@ -423,7 +355,7 @@ func TestClientWithResponsesMethods(t *testing.T) {
 
 // TestClientMakesRequest verifies client makes correct requests
 func TestClientMakesRequest(t *testing.T) {
-	t.Run("RetrieveResourceTypesCopy (List Users)", func(t *testing.T) {
+	t.Run("ListUsers", func(t *testing.T) {
 		mockRT := &MockRoundTripper{
 			Response: mockJSONResponse(200, struct {
 				Resources []interface{} `json:"Resources"`
@@ -436,7 +368,7 @@ func TestClientMakesRequest(t *testing.T) {
 			WithHTTPClient(&http.Client{Transport: mockRT}))
 		require.NoError(t, err)
 
-		_, err = client.RetrieveResourceTypesCopy(context.Background(), "org-123", nil)
+		_, err = client.ListUsers(context.Background(), "org-123", nil)
 		require.NoError(t, err)
 
 		assert.NotNil(t, mockRT.LastReq)
@@ -444,7 +376,7 @@ func TestClientMakesRequest(t *testing.T) {
 		assert.Contains(t, mockRT.LastReq.URL.Path, "/org-123/Users")
 	})
 
-	t.Run("CreateUserCopy (Get User)", func(t *testing.T) {
+	t.Run("GetUser", func(t *testing.T) {
 		mockRT := &MockRoundTripper{
 			Response: mockJSONResponse(200, struct{}{}),
 		}
@@ -453,7 +385,7 @@ func TestClientMakesRequest(t *testing.T) {
 			WithHTTPClient(&http.Client{Transport: mockRT}))
 		require.NoError(t, err)
 
-		_, err = client.CreateUserCopy(context.Background(), "org-123", "user-456", nil)
+		_, err = client.GetUser(context.Background(), "org-123", "user-456", nil)
 		require.NoError(t, err)
 
 		assert.NotNil(t, mockRT.LastReq)
@@ -492,7 +424,7 @@ func TestWithRequestEditorFn(t *testing.T) {
 		WithRequestEditorFn(editor))
 	require.NoError(t, err)
 
-	_, err = client.RetrieveResourceTypesCopy(context.Background(), "org-123", nil)
+	_, err = client.ListUsers(context.Background(), "org-123", nil)
 	require.NoError(t, err)
 
 	assert.True(t, editorCalled)

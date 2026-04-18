@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
+	"github.com/tsarlewey/proof-cli/pkg/utils"
 )
 
 // realEstateCmd represents the real-estate command
@@ -44,69 +45,34 @@ var reListTransactionsCmd = &cobra.Command{
 		lastUpdatedDateEnd, _ := cmd.Flags().GetString("last-updated-date-end")
 
 		params := &realestate.GetAllMortgageTransactionsParams{
-			DocumentUrlVersion: ptr(realestate.GetAllMortgageTransactionsParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetAllMortgageTransactionsParamsDocumentUrlVersionV2),
 		}
 
 		if limit > 0 {
-			params.Limit = ptr(limit)
+			params.Limit = utils.Ptr(limit)
 		}
 		if offset > 0 {
-			params.Offset = ptr(offset)
+			params.Offset = utils.Ptr(offset)
 		}
 		if status != "" {
-			params.TransactionStatus = ptr(realestate.GetAllMortgageTransactionsParamsTransactionStatus(status))
+			params.TransactionStatus = utils.Ptr(realestate.GetAllMortgageTransactionsParamsTransactionStatus(status))
 		}
 		if organizationID != "" {
-			params.OrganizationId = ptr(organizationID)
+			params.OrganizationId = utils.Ptr(organizationID)
 		}
 		if loanNumber != "" {
-			params.LoanNumber = ptr(loanNumber)
+			params.LoanNumber = utils.Ptr(loanNumber)
 		}
 
-		// Parse date filters if provided
-		if createdDateStart != "" {
-			t, err := time.Parse(time.RFC3339, createdDateStart)
-			if err != nil {
-				fmt.Printf("Error parsing created-date-start: %v\n", err)
-				os.Exit(1)
-			}
-			params.CreatedDateStart = &t
-		}
-
-		if createdDateEnd != "" {
-			t, err := time.Parse(time.RFC3339, createdDateEnd)
-			if err != nil {
-				fmt.Printf("Error parsing created-date-end: %v\n", err)
-				os.Exit(1)
-			}
-			params.CreatedDateEnd = &t
-		}
-
-		if lastUpdatedDateStart != "" {
-			t, err := time.Parse(time.RFC3339, lastUpdatedDateStart)
-			if err != nil {
-				fmt.Printf("Error parsing last-updated-date-start: %v\n", err)
-				os.Exit(1)
-			}
-			params.LastUpdatedDateStart = &t
-		}
-
-		if lastUpdatedDateEnd != "" {
-			t, err := time.Parse(time.RFC3339, lastUpdatedDateEnd)
-			if err != nil {
-				fmt.Printf("Error parsing last-updated-date-end: %v\n", err)
-				os.Exit(1)
-			}
-			params.LastUpdatedDateEnd = &t
-		}
+		params.CreatedDateStart = parseDateFlag("created-date-start", createdDateStart, time.RFC3339)
+		params.CreatedDateEnd = parseDateFlag("created-date-end", createdDateEnd, time.RFC3339)
+		params.LastUpdatedDateStart = parseDateFlag("last-updated-date-start", lastUpdatedDateStart, time.RFC3339)
+		params.LastUpdatedDateEnd = parseDateFlag("last-updated-date-end", lastUpdatedDateEnd, time.RFC3339)
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.GetAllMortgageTransactionsWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error listing transactions:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "listing transactions")
 
 		PrintResponse(resp.Body)
 	},
@@ -122,16 +88,13 @@ var reGetTransactionCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &realestate.GetMortgageTransactionParams{
-			DocumentUrlVersion: ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.GetMortgageTransactionWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error getting transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -150,13 +113,13 @@ var reCreateTransactionCmd = &cobra.Command{
 		loanNumber, _ := cmd.Flags().GetString("loan-number")
 
 		queryParams := &realestate.CreateMortgageTransactionParams{
-			DocumentUrlVersion: ptr(realestate.CreateMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.CreateMortgageTransactionParamsDocumentUrlVersionV2),
 		}
 
 		body := realestate.CreateMortgageTransactionJSONRequestBody{
-			Draft:      ptr(draft),
-			FileNumber: ptrIfNotEmpty(fileNumber),
-			LoanNumber: ptrIfNotEmpty(loanNumber),
+			Draft:      utils.Ptr(draft),
+			FileNumber: utils.PtrIfNotEmpty(fileNumber),
+			LoanNumber: utils.PtrIfNotEmpty(loanNumber),
 		}
 
 		// Set transaction type if provided
@@ -168,10 +131,7 @@ var reCreateTransactionCmd = &cobra.Command{
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.CreateMortgageTransactionWithResponse(context.Background(), queryParams, body)
-		if err != nil {
-			fmt.Println("Error creating transaction:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -187,16 +147,13 @@ var rePlaceOrderCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &realestate.PlaceOrderParams{
-			DocumentUrlVersion: ptr(realestate.PlaceOrderParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.PlaceOrderParamsDocumentUrlVersionV2),
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.PlaceOrderWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error placing order:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "placing order")
 
 		PrintResponse(resp.Body)
 	},
@@ -219,16 +176,13 @@ var reListDocumentsCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &realestate.GetMortgageTransactionParams{
-			DocumentUrlVersion: ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
 		}
 
 		// Get transaction which includes documents
 		client := getRealEstateClient()
 		resp, err := client.GetMortgageTransactionWithResponse(context.Background(), transactionID, params)
-		if err != nil {
-			fmt.Println("Error listing documents:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "listing documents")
 
 		PrintResponse(resp.Body)
 	},
@@ -247,19 +201,16 @@ var reGetDocumentCmd = &cobra.Command{
 		encoding, _ := cmd.Flags().GetString("encoding")
 
 		params := &realestate.GetMortgageDocumentParams{
-			DocumentUrlVersion: ptr(realestate.GetMortgageDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageDocumentParamsDocumentUrlVersionV2),
 		}
 		if encoding != "" {
-			params.Encoding = ptr(realestate.GetMortgageDocumentParamsEncoding(encoding))
+			params.Encoding = utils.Ptr(realestate.GetMortgageDocumentParamsEncoding(encoding))
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.GetMortgageDocumentWithResponse(context.Background(), transactionID, documentID, params)
-		if err != nil {
-			fmt.Println("Error getting document:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "getting document")
 
 		PrintResponse(resp.Body)
 	},
@@ -280,30 +231,24 @@ var reUploadDocumentCmd = &cobra.Command{
 
 		// Read the file
 		fileContent, err := os.ReadFile(filePath)
-		if err != nil {
-			fmt.Println("Error reading file:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "reading file")
 
 		// Encode document to base64
 		documentBase64 := base64.StdEncoding.EncodeToString(fileContent)
 
 		queryParams := &realestate.AddMortgageDocumentParams{
-			DocumentUrlVersion: ptr(realestate.AddMortgageDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.AddMortgageDocumentParamsDocumentUrlVersionV2),
 		}
 
 		body := realestate.AddMortgageDocumentJSONRequestBody{
-			Resource: ptr(documentBase64),
-			Filename: ptrIfNotEmpty(filename),
+			Resource: utils.Ptr(documentBase64),
+			Filename: utils.PtrIfNotEmpty(filename),
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.AddMortgageDocumentWithResponse(context.Background(), transactionID, queryParams, body)
-		if err != nil {
-			fmt.Println("Error uploading document:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "uploading document")
 
 		PrintResponse(resp.Body)
 	},
@@ -325,10 +270,7 @@ var reListWebhooksCmd = &cobra.Command{
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.GetAllMortgageWebhooksV2WithResponse(context.Background())
-		if err != nil {
-			fmt.Println("Error listing webhooks:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "listing webhooks")
 
 		PrintResponse(resp.Body)
 	},
@@ -351,16 +293,13 @@ var reCreateWebhookCmd = &cobra.Command{
 		}
 
 		if header != "" {
-			body.Header = ptr(header)
+			body.Header = utils.Ptr(header)
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.CreateMortgageWebhookV2WithResponse(context.Background(), body)
-		if err != nil {
-			fmt.Println("Error creating webhook:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "creating webhook")
 
 		PrintResponse(resp.Body)
 	},
@@ -393,21 +332,18 @@ var reVerifyAddressCmd = &cobra.Command{
 
 		params := &realestate.GetRecordingLocationsParams{
 			TransactionType:    txnType,
-			StreetAddressLine1: ptr(line1),
-			StreetAddressCity:  ptr(city),
-			StreetAddressState: ptr(state),
+			StreetAddressLine1: utils.Ptr(line1),
+			StreetAddressCity:  utils.Ptr(city),
+			StreetAddressState: utils.Ptr(state),
 		}
 		if postalCode != "" {
-			params.StreetAddressPostal = ptr(postalCode)
+			params.StreetAddressPostal = utils.Ptr(postalCode)
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
 		resp, err := client.GetRecordingLocationsWithResponse(context.Background(), params)
-		if err != nil {
-			fmt.Println("Error verifying address:", err)
-			os.Exit(1)
-		}
+		utils.HandleError(err, "verifying address")
 
 		PrintResponse(resp.Body)
 	},

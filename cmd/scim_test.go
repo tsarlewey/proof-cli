@@ -2,62 +2,26 @@ package cmd
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// PatchOperation represents a SCIM PATCH operation for testing
-type PatchOperation struct {
-	Op    string `json:"op"`
-	Path  string `json:"path,omitempty"`
-	Value any    `json:"value,omitempty"`
-}
-
-// parsePatchOperation parses a string in "op:path:value" format
-// This is the same logic used in scimPatchUserCmd
-func parsePatchOperation(op string) (*PatchOperation, error) {
-	parts := strings.SplitN(op, ":", 3)
-	if len(parts) < 2 {
-		return nil, nil // Invalid format
-	}
-
-	patchOp := &PatchOperation{
-		Op:   parts[0],
-		Path: parts[1],
-	}
-
-	// Add value if provided
-	if len(parts) == 3 {
-		value := parts[2]
-		// Try to parse as JSON, fallback to string
-		var jsonValue interface{}
-		if err := json.Unmarshal([]byte(value), &jsonValue); err == nil {
-			patchOp.Value = jsonValue
-		} else {
-			patchOp.Value = value
-		}
-	}
-
-	return patchOp, nil
-}
-
-func TestScimPatchOperation_Parse_Simple(t *testing.T) {
+func TestParseSCIMPatchOp_Simple(t *testing.T) {
 	testCases := []struct {
 		name         string
 		input        string
 		expectedOp   string
 		expectedPath string
-		expectedVal  interface{}
+		expectedVal  any
 	}{
 		{
-			name:         "replace active with string",
+			name:         "replace active with false",
 			input:        "replace:active:false",
 			expectedOp:   "replace",
 			expectedPath: "active",
-			expectedVal:  false, // JSON parsed to bool
+			expectedVal:  false,
 		},
 		{
 			name:         "replace active with true",
@@ -67,14 +31,14 @@ func TestScimPatchOperation_Parse_Simple(t *testing.T) {
 			expectedVal:  true,
 		},
 		{
-			name:         "add role",
+			name:         "add role plain string",
 			input:        "add:roles:admin",
 			expectedOp:   "add",
 			expectedPath: "roles",
-			expectedVal:  "admin", // plain string
+			expectedVal:  "admin",
 		},
 		{
-			name:         "remove path",
+			name:         "remove path no value",
 			input:        "remove:emails",
 			expectedOp:   "remove",
 			expectedPath: "emails",
@@ -84,136 +48,122 @@ func TestScimPatchOperation_Parse_Simple(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := parsePatchOperation(tc.input)
+			op, err := parseSCIMPatchOp(tc.input)
 
 			require.NoError(t, err)
-			require.NotNil(t, result)
-			assert.Equal(t, tc.expectedOp, result.Op)
-			assert.Equal(t, tc.expectedPath, result.Path)
-			assert.Equal(t, tc.expectedVal, result.Value)
+			assert.Equal(t, tc.expectedOp, op.Op)
+			assert.Equal(t, tc.expectedPath, op.Path)
+			assert.Equal(t, tc.expectedVal, op.Value)
 		})
 	}
 }
 
-func TestScimPatchOperation_ParseJSON(t *testing.T) {
+func TestParseSCIMPatchOp_JSONValues(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       string
-		expectedVal interface{}
+		expectedVal any
 	}{
-		{
-			name:        "JSON number",
-			input:       "replace:count:42",
-			expectedVal: float64(42), // JSON numbers are float64
-		},
-		{
-			name:        "JSON string",
-			input:       `replace:name:"John"`,
-			expectedVal: "John",
-		},
-		{
-			name:        "JSON array",
-			input:       `replace:roles:["admin","user"]`,
-			expectedVal: []interface{}{"admin", "user"},
-		},
-		{
-			name:        "JSON object",
-			input:       `replace:config:{"key":"value"}`,
-			expectedVal: map[string]interface{}{"key": "value"},
-		},
-		{
-			name:        "JSON null",
-			input:       "replace:data:null",
-			expectedVal: nil,
-		},
+		{"JSON number", "replace:count:42", float64(42)},
+		{"JSON quoted string", `replace:name:"John"`, "John"},
+		{"JSON array", `replace:roles:["admin","user"]`, []any{"admin", "user"}},
+		{"JSON object", `replace:config:{"key":"value"}`, map[string]any{"key": "value"}},
+		{"JSON null", "replace:data:null", nil},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := parsePatchOperation(tc.input)
+			op, err := parseSCIMPatchOp(tc.input)
 
 			require.NoError(t, err)
-			require.NotNil(t, result)
-			assert.Equal(t, tc.expectedVal, result.Value)
+			assert.Equal(t, tc.expectedVal, op.Value)
 		})
 	}
 }
 
-func TestScimPatchOperation_ParseInvalid(t *testing.T) {
-	// Single part (no colon) should return nil
-	result, err := parsePatchOperation("invalid")
+func TestParseSCIMPatchOp_Invalid(t *testing.T) {
+	_, err := parseSCIMPatchOp("invalid")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid operation format")
+}
 
+func TestParseSCIMPatchOp_EmptyValueAfterColon(t *testing.T) {
+	op, err := parseSCIMPatchOp("replace:active:")
 	require.NoError(t, err)
-	assert.Nil(t, result)
+	assert.Equal(t, "replace", op.Op)
+	assert.Equal(t, "active", op.Path)
+	assert.Equal(t, "", op.Value)
 }
 
-func TestScimPatchOperation_ParseEmptyValue(t *testing.T) {
-	// Operation with empty value after colon
-	result, err := parsePatchOperation("replace:active:")
-
+func TestParseSCIMPatchOp_ColonInValue(t *testing.T) {
+	op, err := parseSCIMPatchOp("replace:url:https://example.com:8080/path")
 	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, "replace", result.Op)
-	assert.Equal(t, "active", result.Path)
-	assert.Equal(t, "", result.Value) // Empty string value
+	assert.Equal(t, "replace", op.Op)
+	assert.Equal(t, "url", op.Path)
+	assert.Equal(t, "https://example.com:8080/path", op.Value)
 }
 
-func TestScimPatchOperation_ParseColonInValue(t *testing.T) {
-	// Value containing colons should be preserved
-	result, err := parsePatchOperation("replace:url:https://example.com:8080/path")
-
+func TestParseSCIMPatchOp_ComplexPath(t *testing.T) {
+	op, err := parseSCIMPatchOp("replace:name.givenName:John")
 	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, "replace", result.Op)
-	assert.Equal(t, "url", result.Path)
-	assert.Equal(t, "https://example.com:8080/path", result.Value)
+	assert.Equal(t, "name.givenName", op.Path)
+	assert.Equal(t, "John", op.Value)
 }
 
-func TestScimPatchOperation_ParseComplexPath(t *testing.T) {
-	// SCIM paths can be complex like "name.givenName"
-	result, err := parsePatchOperation("replace:name.givenName:John")
+func TestBuildSCIMPatchBody_Empty(t *testing.T) {
+	_, err := buildSCIMPatchBody(nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one operation")
 
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, "replace", result.Op)
-	assert.Equal(t, "name.givenName", result.Path)
-	assert.Equal(t, "John", result.Value)
+	_, err = buildSCIMPatchBody([]string{})
+	require.Error(t, err)
 }
 
-func TestScimPatchOperation_Operations(t *testing.T) {
-	// Test all standard SCIM operations
-	operations := []string{"add", "replace", "remove"}
-
-	for _, op := range operations {
-		t.Run(op, func(t *testing.T) {
-			input := op + ":path:value"
-			result, err := parsePatchOperation(input)
-
-			require.NoError(t, err)
-			require.NotNil(t, result)
-			assert.Equal(t, op, result.Op)
-		})
-	}
+func TestBuildSCIMPatchBody_InvalidOpFails(t *testing.T) {
+	_, err := buildSCIMPatchBody([]string{"replace:active:false", "garbage"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid operation format")
 }
 
-func TestScimPatchOperation_MultipleParsing(t *testing.T) {
-	// Simulate parsing multiple operations as in the command
-	operations := []string{
+func TestBuildSCIMPatchBody_ShapeAndRoundTrip(t *testing.T) {
+	// The upstream spec models Operations as a single object, but SCIM PATCH
+	// requires an array. This test confirms the body actually has an array.
+	raw := []string{
 		"replace:active:false",
-		"add:roles:[\"admin\"]",
+		`add:roles:["admin","user"]`,
 		"replace:name.givenName:John",
 	}
 
-	var patchOps []PatchOperation
-	for _, op := range operations {
-		parsed, err := parsePatchOperation(op)
-		require.NoError(t, err)
-		require.NotNil(t, parsed)
-		patchOps = append(patchOps, *parsed)
-	}
+	body, err := buildSCIMPatchBody(raw)
+	require.NoError(t, err)
 
-	assert.Len(t, patchOps, 3)
-	assert.Equal(t, "replace", patchOps[0].Op)
-	assert.Equal(t, "add", patchOps[1].Op)
-	assert.Equal(t, "replace", patchOps[2].Op)
+	var decoded struct {
+		Operations []scimPatchOperation `json:"Operations"`
+	}
+	require.NoError(t, json.Unmarshal(body, &decoded))
+
+	require.Len(t, decoded.Operations, 3)
+
+	assert.Equal(t, "replace", decoded.Operations[0].Op)
+	assert.Equal(t, "active", decoded.Operations[0].Path)
+	assert.Equal(t, false, decoded.Operations[0].Value)
+
+	assert.Equal(t, "add", decoded.Operations[1].Op)
+	assert.Equal(t, "roles", decoded.Operations[1].Path)
+	assert.Equal(t, []any{"admin", "user"}, decoded.Operations[1].Value)
+
+	assert.Equal(t, "replace", decoded.Operations[2].Op)
+	assert.Equal(t, "name.givenName", decoded.Operations[2].Path)
+	assert.Equal(t, "John", decoded.Operations[2].Value)
+}
+
+func TestBuildSCIMPatchBody_OmitsNilValueField(t *testing.T) {
+	// A "remove" op has no value — the JSON should omit the value field
+	// rather than serialize it as null.
+	body, err := buildSCIMPatchBody([]string{"remove:emails"})
+	require.NoError(t, err)
+
+	assert.NotContains(t, string(body), `"value"`)
+	assert.Contains(t, string(body), `"op":"remove"`)
+	assert.Contains(t, string(body), `"path":"emails"`)
 }
