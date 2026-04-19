@@ -1,4 +1,4 @@
-.PHONY: build generate download-specs regenerate clean install fmt vet tools test test-race coverage check help
+.PHONY: build generate download-specs regenerate clean install fmt vet tools test test-race coverage check smoke smoke-go help
 
 # Build the CLI binary
 build:
@@ -91,6 +91,15 @@ clean:
 # Run all checks (format, vet, build, test with race detector)
 check: fmt vet build test-race
 
+# Run read-only smoke tests (shell) against the live Proof API.
+# Set PROOF_SMOKE_ORG_ID to also exercise SCIM endpoints.
+smoke: build
+	./scripts/smoke-test.sh
+
+# Run read-only smoke tests (Go, build-tag smoke) against the live Proof API.
+smoke-go: build
+	PROOF_BIN=$(PWD)/proof go test -tags=smoke -v ./test/smoke/...
+
 # Show available targets
 help:
 	@echo "Available targets:"
@@ -107,3 +116,5 @@ help:
 	@echo "  regenerate     download-specs + generate + build + test"
 	@echo "  clean          Remove binary and generated files"
 	@echo "  check          fmt + vet + build + test-race"
+	@echo "  smoke          Run shell smoke tests against live API (set PROOF_SMOKE_ORG_ID for SCIM)"
+	@echo "  smoke-go       Run Go smoke tests (build-tag smoke) against live API"
