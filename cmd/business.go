@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
+	"github.com/tsarlewey/proof-sdk-go/business"
 )
 
 // businessCmd represents the business command
@@ -60,6 +60,7 @@ var bizListTransactionsCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetAllTransactionsWithResponse(context.Background(), params)
 		utils.HandleError(err, "fetching transactions")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "fetching transactions")
 
 		PrintResponse(resp.Body)
 	},
@@ -83,6 +84,7 @@ var bizGetTransactionCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetTransactionWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "fetching transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "fetching transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -138,6 +140,7 @@ var bizCreateTransactionCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.CreateTransactionWithResponse(context.Background(), queryParams, body)
 		utils.HandleError(err, "creating transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -156,6 +159,7 @@ var bizDeleteTransactionCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.DeleteTransactionWithResponse(context.Background(), transactionID)
 		utils.HandleError(err, "deleting transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "deleting transaction")
 
 		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Transaction deleted successfully")
@@ -181,6 +185,7 @@ var bizActivateTransactionCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.ActivateDraftTransactionWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "activating transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "activating transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -207,6 +212,7 @@ var bizRecallTransactionCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.RecallTransactionWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "recalling transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "recalling transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -233,6 +239,7 @@ var bizResendEmailCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.ResendTransactionEmailWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "resending email")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "resending email")
 
 		PrintResponse(resp.Body)
 	},
@@ -259,6 +266,7 @@ var bizResendSMSCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.ResendTransactionSMSWithResponse(context.Background(), transactionID, params, business.ResendTransactionSMSJSONRequestBody{})
 		utils.HandleError(err, "resending SMS")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "resending SMS")
 
 		PrintResponse(resp.Body)
 	},
@@ -277,6 +285,7 @@ var bizGetEligibleNotariesCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetAllEligibleNotariesWithResponse(context.Background(), transactionID)
 		utils.HandleError(err, "getting eligible notaries")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting eligible notaries")
 
 		PrintResponse(resp.Body)
 	},
@@ -354,6 +363,7 @@ var bizAddDocumentCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.AddDocumentWithResponse(context.Background(), transactionID, queryParams, body)
 		utils.HandleError(err, "adding document")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "adding document")
 
 		PrintResponse(resp.Body)
 	},
@@ -382,6 +392,7 @@ var bizGetDocumentCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetDocumentWithResponse(context.Background(), transactionID, documentID, params)
 		utils.HandleError(err, "fetching document")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "fetching document")
 
 		PrintResponse(resp.Body)
 	},
@@ -400,6 +411,7 @@ var bizDeleteDocumentCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.DeleteDocumentWithResponse(context.Background(), documentID)
 		utils.HandleError(err, "deleting document")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "deleting document")
 
 		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Document deleted successfully")
@@ -427,6 +439,7 @@ var bizGetWebhookCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetWebhookURLWithResponse(context.Background())
 		utils.HandleError(err, "getting webhook")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting webhook")
 
 		PrintResponse(resp.Body)
 	},
@@ -443,6 +456,7 @@ var bizListWebhooksCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetAllWebhooksV2WithResponse(context.Background())
 		utils.HandleError(err, "listing webhooks")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing webhooks")
 
 		PrintResponse(resp.Body)
 	},
@@ -462,6 +476,7 @@ var bizGetWebhookV2Cmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetWebhookV2WithResponse(context.Background(), webhookID)
 		utils.HandleError(err, "getting webhook v2")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting webhook v2")
 
 		PrintResponse(resp.Body)
 	},
@@ -495,6 +510,7 @@ var bizCreateWebhookCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.CreateWebhookV2WithResponse(context.Background(), body)
 		utils.HandleError(err, "creating webhook v2")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating webhook v2")
 
 		PrintResponse(resp.Body)
 	},
@@ -527,6 +543,7 @@ var bizUpdateWebhookCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.UpdateWebhookV2WithResponse(context.Background(), webhookID, body)
 		utils.HandleError(err, "updating webhook v2")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "updating webhook v2")
 
 		PrintResponse(resp.Body)
 	},
@@ -546,6 +563,7 @@ var bizDeleteWebhookCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.DeleteWebhookV2WithResponse(context.Background(), webhookID)
 		utils.HandleError(err, "deleting webhook v2")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "deleting webhook v2")
 
 		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Webhook v2 deleted successfully")
@@ -567,6 +585,7 @@ var bizGetWebhookEventsCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetWebhookEventsV2WithResponse(context.Background(), webhookID, nil)
 		utils.HandleError(err, "getting webhook v2 events")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting webhook v2 events")
 
 		PrintResponse(resp.Body)
 	},
@@ -583,6 +602,7 @@ var bizGetWebhookSubscriptionsCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetWebhookSubscriptionsV2WithResponse(context.Background())
 		utils.HandleError(err, "getting webhook v2 subscriptions")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting webhook v2 subscriptions")
 
 		PrintResponse(resp.Body)
 	},
@@ -617,6 +637,7 @@ var bizListNotariesCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetAllNotariesWithResponse(context.Background(), params)
 		utils.HandleError(err, "listing notaries")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing notaries")
 
 		PrintResponse(resp.Body)
 	},
@@ -636,6 +657,7 @@ var bizGetNotaryCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetNotaryWithResponse(context.Background(), notaryID)
 		utils.HandleError(err, "getting notary")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting notary")
 
 		PrintResponse(resp.Body)
 	},
@@ -673,6 +695,7 @@ var bizCreateNotaryCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.CreateNotaryWithResponse(context.Background(), body)
 		utils.HandleError(err, "creating notary")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating notary")
 
 		PrintResponse(resp.Body)
 	},
@@ -692,6 +715,7 @@ var bizDeleteNotaryCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.DeleteNotaryWithResponse(context.Background(), notaryID)
 		utils.HandleError(err, "deleting notary")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "deleting notary")
 
 		if isSuccess(resp.StatusCode()) {
 			fmt.Println("Notary deleted successfully")
@@ -728,6 +752,7 @@ var bizListTemplatesCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetAllTemplatesWithResponse(context.Background(), params)
 		utils.HandleError(err, "listing templates")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing templates")
 
 		PrintResponse(resp.Body)
 	},
@@ -768,6 +793,7 @@ var bizCreateReferralCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.CreateReferralWithResponse(context.Background(), body)
 		utils.HandleError(err, "creating referral campaign")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating referral campaign")
 
 		PrintResponse(resp.Body)
 	},
@@ -791,6 +817,7 @@ var bizGenerateReferralCodeCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GenerateReferralCodeWithResponse(context.Background(), referralCampaignID, body)
 		utils.HandleError(err, "generating referral code")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "generating referral code")
 
 		PrintResponse(resp.Body)
 	},
@@ -852,6 +879,7 @@ var bizCreateIntegrationCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.CreateIntegrationWithResponse(context.Background(), body)
 		utils.HandleError(err, "creating integration")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating integration")
 
 		PrintResponse(resp.Body)
 	},

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
+	"github.com/tsarlewey/proof-sdk-go/scim"
 )
 
 // scimCmd represents the scim command
@@ -116,6 +116,7 @@ var scimListUsersCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.ListUsersWithResponse(context.Background(), organizationID, params)
 		utils.HandleError(err, "listing users")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing users")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -136,6 +137,7 @@ var scimGetUserCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.GetUserWithResponse(context.Background(), organizationID, userID, nil)
 		utils.HandleError(err, "getting user")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting user")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -205,6 +207,7 @@ var scimCreateUserCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.CreateUserWithResponse(context.Background(), organizationID, nil, body)
 		utils.HandleError(err, "creating user")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating user")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -275,6 +278,7 @@ var scimUpdateUserCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.UpdateUserWithResponse(context.Background(), organizationID, userID, nil, body)
 		utils.HandleError(err, "updating user")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "updating user")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -308,6 +312,7 @@ var scimPatchUserCmd = &cobra.Command{
 			bytes.NewReader(bodyBytes),
 		)
 		utils.HandleError(err, "patching user")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "patching user")
 
 		PrintResponse(resp.Body)
 	},
@@ -327,6 +332,7 @@ var scimDeleteUserCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.DeleteUserWithResponse(context.Background(), organizationID, userID, nil)
 		utils.HandleError(err, "deleting user")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "deleting user")
 
 		if len(resp.Body) > 0 {
 			PrintResponse(resp.Body)
@@ -356,6 +362,7 @@ var scimGetUserSchemaCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.RetrieveUsersSchemaWithResponse(context.Background(), organizationID)
 		utils.HandleError(err, "getting user schema")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting user schema")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -375,6 +382,7 @@ var scimGetServiceProviderConfigCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.GetServiceProviderConfigWithResponse(context.Background(), organizationID)
 		utils.HandleError(err, "getting service provider config")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting service provider config")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -394,6 +402,7 @@ var scimGetResourceTypesCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.GetResourceTypesWithResponse(context.Background(), organizationID)
 		utils.HandleError(err, "getting resource types")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting resource types")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
+	"github.com/tsarlewey/proof-sdk-go/realestate"
 )
 
 // realEstateCmd represents the real-estate command
@@ -73,6 +73,7 @@ var reListTransactionsCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetAllMortgageTransactionsWithResponse(context.Background(), params)
 		utils.HandleError(err, "listing transactions")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing transactions")
 
 		PrintResponse(resp.Body)
 	},
@@ -95,6 +96,7 @@ var reGetTransactionCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetMortgageTransactionWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "getting transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -132,6 +134,7 @@ var reCreateTransactionCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.CreateMortgageTransactionWithResponse(context.Background(), queryParams, body)
 		utils.HandleError(err, "creating transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating transaction")
 
 		PrintResponse(resp.Body)
 	},
@@ -154,6 +157,7 @@ var rePlaceOrderCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.PlaceOrderWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "placing order")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "placing order")
 
 		PrintResponse(resp.Body)
 	},
@@ -183,6 +187,7 @@ var reListDocumentsCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetMortgageTransactionWithResponse(context.Background(), transactionID, params)
 		utils.HandleError(err, "listing documents")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing documents")
 
 		PrintResponse(resp.Body)
 	},
@@ -211,6 +216,7 @@ var reGetDocumentCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetMortgageDocumentWithResponse(context.Background(), transactionID, documentID, params)
 		utils.HandleError(err, "getting document")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting document")
 
 		PrintResponse(resp.Body)
 	},
@@ -249,6 +255,7 @@ var reUploadDocumentCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.AddMortgageDocumentWithResponse(context.Background(), transactionID, queryParams, body)
 		utils.HandleError(err, "uploading document")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "uploading document")
 
 		PrintResponse(resp.Body)
 	},
@@ -271,6 +278,7 @@ var reListWebhooksCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetAllMortgageWebhooksV2WithResponse(context.Background())
 		utils.HandleError(err, "listing webhooks")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing webhooks")
 
 		PrintResponse(resp.Body)
 	},
@@ -300,6 +308,7 @@ var reCreateWebhookCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.CreateMortgageWebhookV2WithResponse(context.Background(), body)
 		utils.HandleError(err, "creating webhook")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating webhook")
 
 		PrintResponse(resp.Body)
 	},
@@ -344,6 +353,7 @@ var reVerifyAddressCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetRecordingLocationsWithResponse(context.Background(), params)
 		utils.HandleError(err, "verifying address")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "verifying address")
 
 		PrintResponse(resp.Body)
 	},

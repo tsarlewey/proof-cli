@@ -9,11 +9,11 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/common"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
+	"github.com/tsarlewey/proof-sdk-go/business"
+	"github.com/tsarlewey/proof-sdk-go/common"
+	"github.com/tsarlewey/proof-sdk-go/realestate"
+	"github.com/tsarlewey/proof-sdk-go/scim"
 )
 
 var (
@@ -225,6 +225,21 @@ func PrintVerbose(message string) {
 // isSuccess reports whether an HTTP status code is in the 2xx range.
 func isSuccess(code int) bool {
 	return code >= 200 && code < 300
+}
+
+// checkAPIStatus exits 1 if the HTTP status is non-2xx, printing the response
+// body to stderr so the caller can see the API's error detail. SDK calls
+// return (resp, err) where err is only set on transport errors — this helper
+// closes the gap so application-level 4xx/5xx responses also fail fast.
+func checkAPIStatus(statusCode int, body []byte, action string) {
+	if isSuccess(statusCode) {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Error %s: API returned status %d\n", action, statusCode)
+	if len(body) > 0 {
+		fmt.Fprintln(os.Stderr, string(body))
+	}
+	os.Exit(1)
 }
 
 // parseDateFlag parses an optional date flag value. Returns nil when value is

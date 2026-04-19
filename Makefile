@@ -1,4 +1,4 @@
-.PHONY: build generate download-specs regenerate clean install fmt vet tools test test-race coverage check smoke smoke-go help
+.PHONY: build install fmt vet test test-race coverage check clean smoke smoke-go smoke-write smoke-write-go help
 
 # Build the CLI binary
 build:
@@ -30,66 +30,12 @@ coverage:
 	@echo "Coverage summary:"
 	@go tool cover -func=coverage.out | tail -n 1
 
-# Install tool dependencies
-tools:
-	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-
-# Download OpenAPI specs from dev.proof.com
-download-specs:
-	@mkdir -p openapi
-	@echo "Downloading Business API spec..."
-	@curl -sL "https://dev.proof.com/openapi/proof-business-api-specification.json" -o openapi/business.json
-	@echo "Downloading Real Estate API spec..."
-	@curl -sL "https://dev.proof.com/openapi/proof-real-estate-api-specification.json" -o openapi/realestate.json
-	@echo "Downloading SCIM API spec..."
-	@curl -sL "https://dev.proof.com/openapi/proof-scim-api-specification.json" -o openapi/scim.json
-	@echo "Downloading Logs API spec..."
-	@curl -sL "https://dev.proof.com/openapi/proof-logs-api-specification.json" -o openapi/logs.json
-	@echo "Downloading Certificates API spec..."
-	@curl -sL "https://dev.proof.com/openapi/organization-certificates-openapi-specification.json" -o openapi/certificates.json
-	@echo "Fixing deep $ref references in specs..."
-	@python3 scripts/fix-openapi-refs.py openapi/business.json
-	@python3 scripts/fix-openapi-refs.py openapi/realestate.json
-	@python3 scripts/fix-openapi-refs.py openapi/scim.json
-	@python3 scripts/fix-openapi-refs.py openapi/logs.json
-	@python3 scripts/fix-openapi-refs.py openapi/certificates.json
-	@echo "Fixing SCIM operationIds..."
-	@python3 scripts/fix-scim-operation-ids.py openapi/scim.json
-	@echo "All specs downloaded and fixed!"
-
-# oapi-codegen command - use go run to avoid PATH issues
-OAPI_CODEGEN = go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-
-# Generate SDK clients from OpenAPI specs
-generate:
-	@echo "Generating Business SDK..."
-	@mkdir -p pkg/sdk/business
-	@$(OAPI_CODEGEN) --config pkg/sdk/business/oapi-codegen.yaml openapi/business.json
-	@echo "Generating Real Estate SDK..."
-	@mkdir -p pkg/sdk/realestate
-	@$(OAPI_CODEGEN) --config pkg/sdk/realestate/oapi-codegen.yaml openapi/realestate.json
-	@echo "Generating SCIM SDK..."
-	@mkdir -p pkg/sdk/scim
-	@$(OAPI_CODEGEN) --config pkg/sdk/scim/oapi-codegen.yaml openapi/scim.json
-	@echo "Generating Logs SDK..."
-	@mkdir -p pkg/sdk/logs
-	@$(OAPI_CODEGEN) --config pkg/sdk/logs/oapi-codegen.yaml openapi/logs.json
-	@echo "Generating Certificates SDK..."
-	@mkdir -p pkg/sdk/certificates
-	@$(OAPI_CODEGEN) --config pkg/sdk/certificates/oapi-codegen.yaml openapi/certificates.json
-	@echo "SDK generation complete!"
-
-# Download specs, regenerate all SDKs, then build + test
-regenerate: download-specs generate build test
-
-# Clean generated files and binaries
-clean:
-	rm -f proof proof-cli
-	rm -rf openapi/
-	rm -f pkg/sdk/*/client.gen.go
-
 # Run all checks (format, vet, build, test with race detector)
 check: fmt vet build test-race
+
+# Remove the built binary
+clean:
+	rm -f proof proof-cli
 
 # Run read-only smoke tests (shell) against the live Proof API.
 # Set PROOF_SMOKE_ORG_ID to also exercise SCIM endpoints.
@@ -99,6 +45,14 @@ smoke: build
 # Run read-only smoke tests (Go, build-tag smoke) against the live Proof API.
 smoke-go: build
 	PROOF_BIN=$(PWD)/proof go test -tags=smoke -v ./test/smoke/...
+
+# Run write smoke tests (shell, create+delete). Requires PROOF_SMOKE_WRITE=1.
+smoke-write: build
+	./scripts/smoke-test-write.sh
+
+# Run write smoke tests (Go, build-tag smoke_write). Requires PROOF_SMOKE_WRITE=1.
+smoke-write-go: build
+	PROOF_BIN=$(PWD)/proof go test -tags=smoke_write -v ./test/smoke/...
 
 # Show available targets
 help:
@@ -110,11 +64,11 @@ help:
 	@echo "  test           Run all tests"
 	@echo "  test-race      Run all tests with -race"
 	@echo "  coverage       Run tests with coverage profile"
-	@echo "  tools          Install oapi-codegen tool dependency"
-	@echo "  download-specs Download OpenAPI specs and fix deep \$$ref references"
-	@echo "  generate       Regenerate SDK clients from OpenAPI specs"
-	@echo "  regenerate     download-specs + generate + build + test"
-	@echo "  clean          Remove binary and generated files"
+	@echo "  clean          Remove the built binary"
 	@echo "  check          fmt + vet + build + test-race"
 	@echo "  smoke          Run shell smoke tests against live API (set PROOF_SMOKE_ORG_ID for SCIM)"
 	@echo "  smoke-go       Run Go smoke tests (build-tag smoke) against live API"
+	@echo "  smoke-write    Run shell write smoke tests (PROOF_SMOKE_WRITE=1)"
+	@echo "  smoke-write-go Run Go write smoke tests (build-tag smoke_write)"
+	@echo ""
+	@echo "SDK regeneration moved to github.com/tsarlewey/proof-sdk-go."

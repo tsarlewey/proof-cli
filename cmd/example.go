@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/business"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/realestate"
-	"github.com/tsarlewey/proof-cli/pkg/sdk/scim"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
+	"github.com/tsarlewey/proof-sdk-go/business"
+	"github.com/tsarlewey/proof-sdk-go/realestate"
+	"github.com/tsarlewey/proof-sdk-go/scim"
 )
 
 // exampleCmd represents the example command group
@@ -40,6 +40,7 @@ var exampleListBusinessTransactionsCmd = &cobra.Command{
 		client := getBusinessClient()
 		resp, err := client.GetAllTransactionsWithResponse(context.Background(), params)
 		utils.HandleError(err, "fetching transactions")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "fetching transactions")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -67,6 +68,7 @@ This example creates a notary for demonstration purposes.`,
 		client := getBusinessClient()
 		resp, err := client.CreateNotaryWithResponse(context.Background(), body)
 		utils.HandleError(err, "creating notary")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "creating notary")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -95,6 +97,7 @@ var exampleListRealEstateTransactionsCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetAllMortgageTransactionsWithResponse(context.Background(), params)
 		utils.HandleError(err, "fetching real estate transactions")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "fetching real estate transactions")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -128,6 +131,7 @@ var exampleVerifyAddressCmd = &cobra.Command{
 		client := getRealEstateClient()
 		resp, err := client.GetRecordingLocationsWithResponse(context.Background(), params)
 		utils.HandleError(err, "verifying address")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "verifying address")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -159,6 +163,7 @@ var exampleListSCIMUsersCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.ListUsersWithResponse(context.Background(), organizationID, params)
 		utils.HandleError(err, "listing users")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing users")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)
@@ -180,6 +185,7 @@ var exampleGetSCIMSchemaCmd = &cobra.Command{
 		client := getSCIMClient()
 		resp, err := client.RetrieveUsersSchemaWithResponse(context.Background(), organizationID)
 		utils.HandleError(err, "getting user schema")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "getting user schema")
 
 		// Use global helper to print response
 		PrintResponse(resp.Body)

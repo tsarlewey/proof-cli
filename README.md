@@ -423,50 +423,28 @@ make test           # Run all tests
 make test-race      # Run all tests with -race
 make coverage       # Run tests with coverage profile
 make check          # fmt + vet + build + test-race
-make tools          # Install the oapi-codegen tool dependency
-make download-specs # Download OpenAPI specs and apply fixups
-make generate       # Regenerate SDK clients from OpenAPI specs
-make regenerate     # download-specs + generate + build + test
-make clean          # Remove binary and generated files
+make clean          # Remove the built binary
+make smoke          # Run shell smoke tests against live API
+make smoke-go       # Run Go smoke tests (build-tag smoke)
+make smoke-write    # Run shell write smoke tests (PROOF_SMOKE_WRITE=1)
+make smoke-write-go # Run Go write smoke tests (build-tag smoke_write)
 ```
 
-### SDK Architecture
+### SDK Source
 
-The CLI uses auto-generated SDK clients from OpenAPI specs via `oapi-codegen`:
+The generated Go SDK clients now live in their own repo: [`github.com/tsarlewey/proof-sdk-go`](https://github.com/tsarlewey/proof-sdk-go). This CLI imports them as a regular Go module dependency. If you need to regenerate the clients after an upstream OpenAPI spec change, work inside the SDK repo — the generation toolchain (OpenAPI specs, `oapi-codegen` configs, preprocessing scripts, `make regenerate`) moved there.
 
-- `pkg/sdk/business/` - Business API client
-- `pkg/sdk/realestate/` - Real Estate API client
-- `pkg/sdk/scim/` - SCIM API client
-- `pkg/sdk/logs/` - Security Events (logs) API client
-- `pkg/sdk/certificates/` - Organization certificates API client
-- `pkg/sdk/common/` - Shared authentication adapter (`AuthenticatedDoer`)
-
-Each SDK package contains a generated `client.gen.go`, its own `oapi-codegen.yaml` config, and unit tests. `client.gen.go` files are generated; do not edit them by hand.
-
-### Regenerating SDKs
-
-End-to-end (recommended after upstream spec changes):
+To pick up a new SDK release in this CLI:
 
 ```bash
-make regenerate
-```
-
-This runs `download-specs` → `generate` → `build` → `test`.
-
-`make download-specs` pulls the latest specs from `dev.proof.com` into `openapi/` and applies two preprocessing steps before generation:
-
-- `scripts/fix-openapi-refs.py` — inlines deeply nested `$ref` chains that `oapi-codegen` can't resolve.
-- `scripts/fix-scim-operation-ids.py` — rewrites SCIM `operationId` values so the generated methods are named `ListUsersWithResponse`, `GetUserWithResponse`, etc., instead of the upstream defaults.
-
-To regenerate without re-downloading:
-
-```bash
-make generate
+go get github.com/tsarlewey/proof-sdk-go@<new-version>
+go mod tidy
+make check
 ```
 
 ### Adding or Updating Commands
 
-CLI commands live in `cmd/` (one file per API surface) and are built with [Cobra](https://github.com/spf13/cobra). Each command's `Run` closure calls a method on the generated SDK client via the factory helpers in `cmd/root.go` (`getBusinessClient`, `getRealEstateClient`, `getSCIMClient`). The factories wrap the SDK client with `common.AuthenticatedDoer`, which injects OAuth bearer tokens or the API key on every request.
+CLI commands live in `cmd/` (one file per API surface) and are built with [Cobra](https://github.com/spf13/cobra). Each command's `Run` closure calls a method on the generated SDK client via the factory helpers in `cmd/root.go` (`getBusinessClient`, `getRealEstateClient`, `getSCIMClient`). The factories wrap the SDK client with `common.AuthenticatedDoer` (from the SDK repo), which injects OAuth bearer tokens or the API key on every request.
 
 Shared helpers in `cmd/root.go`:
 
@@ -474,8 +452,9 @@ Shared helpers in `cmd/root.go`:
 - `PrintResponse` / `PrintVerbose` — response output with optional pretty-printing and colorization.
 - `parseDateFlag` — parses optional date-flag values, exits with a clear message on parse failure.
 - `isSuccess` — 2xx status-code check.
+- `checkAPIStatus` — after every SDK call, exits 1 with the body on stderr if the API returned a non-2xx response.
 
-Errors from SDK calls are funneled through `utils.HandleError(err, "action phrase")` which prints to stderr and exits 1.
+Errors from SDK calls are funneled through `utils.HandleError(err, "action phrase")` for transport errors and `checkAPIStatus(resp.StatusCode(), resp.Body, "action phrase")` for application-level HTTP errors. Both exit 1.
 
 ## Support
 
