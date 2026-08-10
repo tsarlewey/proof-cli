@@ -151,8 +151,8 @@ var exampleListSCIMUsersCmd = &cobra.Command{
 		organizationID := args[0]
 
 		// Build query parameters
-		startIndex := int32(1)
-		count := int32(10)
+		startIndex := 1
+		count := 10
 		params := &scim.ListUsersParams{
 			StartIndex: &startIndex,
 			Count:      &count,

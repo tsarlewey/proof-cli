@@ -311,9 +311,9 @@ proof scim users update <organization-id> <user-id> \
   --username "updated@example.com" \
   --given-name "Jane"
 
-# Patch a user (partial update)
+# Patch a user (partial update); --operation is repeatable, format op:path[:value]
 proof scim users patch <organization-id> <user-id> \
-  --operations '[{"op":"replace","path":"active","value":false}]'
+  --operation 'replace:active:false'
 
 # Delete a user
 proof scim users delete <organization-id> <user-id>
@@ -323,7 +323,7 @@ proof scim users delete <organization-id> <user-id>
 
 ```bash
 # Get user schema
-proof scim schemas user-schema <organization-id>
+proof scim schemas user <organization-id>
 
 # Get service provider configuration
 proof scim schemas service-provider-config <organization-id>
@@ -331,6 +331,80 @@ proof scim schemas service-provider-config <organization-id>
 # Get resource types
 proof scim schemas resource-types <organization-id>
 ```
+
+### Security Events API
+
+Read the organization's OCSF-formatted security event log.
+
+```bash
+# List recent security events
+proof logs list
+
+# Page through results
+proof logs list --limit 100
+proof logs list --cursor <next_cursor-from-previous-response>
+
+# Filter
+proof logs list --since 2026-01-01T00:00:00Z
+proof logs list --class-uid 1001 --severity-id 3
+```
+
+### Certificates API
+
+Issue, use, and revoke organization certificates.
+
+```bash
+# List certificates
+proof certificates list --limit 25 --offset 0
+
+# Get one certificate
+proof certificates get <certificate-id>
+
+# Issue a certificate with a Proof-generated key
+proof certificates create \
+  --common-name "Acme Signing Authority" \
+  --profile organization_authenticity_al2
+
+# Issue a certificate from your own CSR
+proof certificates create-from-csr --csr "$(cat request.pem)"
+
+# Sign base64-encoded SHA256 digests (--digest is repeatable, max 25)
+proof certificates sign <certificate-id> --digest "BOGQnhPlcpXqM7fAH6tvFPI4QOXsIyXMiBKtFpblmjU="
+
+# Revoke
+proof certificates revoke <certificate-id> --reason "key compromise"
+```
+
+### Verifiable Credentials API
+
+Requests a Verifiable Credential presentation from an End-User. This endpoint is
+a **browser redirect**, not a server-to-server call — the CLI prints the URL for
+you to send the End-User to, and does not follow it.
+
+```bash
+# Fragment mode: the vp_token comes back on your redirect URI
+proof credentials authorize-url \
+  --client-id <oauth-client-id> \
+  --response-mode fragment \
+  --redirect-uri https://app.example.com/callback \
+  --scope "openid" \
+  --login-hint user@example.com \
+  --nonce "$(openssl rand -hex 16)" \
+  --state "$(openssl rand -hex 8)"
+
+# direct_post mode: Proof POSTs the vp_token to your response URI
+proof credentials authorize-url \
+  --client-id <oauth-client-id> \
+  --response-mode direct_post \
+  --response-uri https://app.example.com/vp \
+  --scope "openid" \
+  --login-hint user@example.com \
+  --nonce "$(openssl rand -hex 16)"
+```
+
+`--redirect-uri` is required in `fragment` mode and rejected in `direct_post`
+mode; `--response-uri` is the reverse. Both URIs must be registered on your
+OAuth Application.
 
 ## Examples
 

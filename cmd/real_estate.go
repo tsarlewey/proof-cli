@@ -149,13 +149,20 @@ var rePlaceOrderCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
+		suppressEmail, _ := cmd.Flags().GetBool("suppress-email")
+		requireVerification, _ := cmd.Flags().GetBool("require-new-signer-verification")
+
 		params := &realestate.PlaceOrderParams{
 			DocumentUrlVersion: utils.Ptr(realestate.PlaceOrderParamsDocumentUrlVersionV2),
+		}
+		body := realestate.PlaceOrderJSONRequestBody{
+			SuppressEmail:                &suppressEmail,
+			RequireNewSignerVerification: &requireVerification,
 		}
 
 		// Make API call using SDK
 		client := getRealEstateClient()
-		resp, err := client.PlaceOrderWithResponse(context.Background(), transactionID, params)
+		resp, err := client.PlaceOrderWithResponse(context.Background(), transactionID, params, body)
 		utils.HandleError(err, "placing order")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "placing order")
 
@@ -373,6 +380,8 @@ func init() {
 	reTransactionsCmd.AddCommand(reGetTransactionCmd)
 	reTransactionsCmd.AddCommand(reCreateTransactionCmd)
 	reTransactionsCmd.AddCommand(rePlaceOrderCmd)
+	rePlaceOrderCmd.Flags().Bool("suppress-email", false, "Don't email the signer on order placement (you must supply transaction_access_link yourself)")
+	rePlaceOrderCmd.Flags().Bool("require-new-signer-verification", false, "Require the signer to verify email ownership")
 
 	// Document subcommands
 	reDocumentsCmd.AddCommand(reListDocumentsCmd)

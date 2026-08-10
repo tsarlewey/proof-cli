@@ -11,7 +11,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
 	"github.com/tsarlewey/proof-sdk-go/business"
+	"github.com/tsarlewey/proof-sdk-go/certificates"
 	"github.com/tsarlewey/proof-sdk-go/common"
+	"github.com/tsarlewey/proof-sdk-go/logs"
 	"github.com/tsarlewey/proof-sdk-go/realestate"
 	"github.com/tsarlewey/proof-sdk-go/scim"
 )
@@ -22,9 +24,11 @@ var (
 	proofClient *utils.ProofClient
 
 	// SDK clients - lazily initialized
-	businessClient   *business.ClientWithResponses
-	realestateClient *realestate.ClientWithResponses
-	scimClient       *scim.ClientWithResponses
+	businessClient     *business.ClientWithResponses
+	realestateClient   *realestate.ClientWithResponses
+	scimClient         *scim.ClientWithResponses
+	logsClient         *logs.ClientWithResponses
+	certificatesClient *certificates.ClientWithResponses
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -101,6 +105,34 @@ func getSCIMClient() *scim.ClientWithResponses {
 		scimClient = client
 	}
 	return scimClient
+}
+
+// getLogsClient returns a lazily-initialized Logs SDK client
+func getLogsClient() *logs.ClientWithResponses {
+	if logsClient == nil {
+		authDoer := common.NewAuthenticatedDoer(proofClient)
+		client, err := logs.NewClientWithResponses(
+			proofClient.GetConfig().APIEndpoint,
+			logs.WithHTTPClient(authDoer),
+		)
+		utils.HandleError(err, "Failed to create Logs SDK client")
+		logsClient = client
+	}
+	return logsClient
+}
+
+// getCertificatesClient returns a lazily-initialized Certificates SDK client
+func getCertificatesClient() *certificates.ClientWithResponses {
+	if certificatesClient == nil {
+		authDoer := common.NewAuthenticatedDoer(proofClient)
+		client, err := certificates.NewClientWithResponses(
+			proofClient.GetConfig().APIEndpoint,
+			certificates.WithHTTPClient(authDoer),
+		)
+		utils.HandleError(err, "Failed to create Certificates SDK client")
+		certificatesClient = client
+	}
+	return certificatesClient
 }
 
 // PrintResponse handles response output with optional pretty printing

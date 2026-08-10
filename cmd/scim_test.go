@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -166,4 +167,58 @@ func TestBuildSCIMPatchBody_OmitsNilValueField(t *testing.T) {
 	assert.NotContains(t, string(body), `"value"`)
 	assert.Contains(t, string(body), `"op":"remove"`)
 	assert.Contains(t, string(body), `"path":"emails"`)
+}
+
+// SCIM models emails and roles as arrays of {value: ...} objects, and active
+// as a real bool. A regression to plain string slices would silently send a
+// body the API rejects.
+func TestBuildSCIMUserBody_Shape(t *testing.T) {
+	cmd := &cobra.Command{}
+	registerSCIMUserFlags(cmd)
+	for name, value := range map[string]string{
+		"username":    "user@example.com",
+		"given-name":  "Ada",
+		"family-name": "Lovelace",
+		"email":       "user@example.com",
+		"roles":       "admin,employee",
+		"external-id": "ext-42",
+		"active":      "false",
+	} {
+		require.NoError(t, cmd.Flags().Set(name, value))
+	}
+
+	body := buildSCIMUserBody(cmd)
+
+	assert.Equal(t, "user@example.com", body.UserName)
+	require.NotNil(t, body.Active)
+	assert.False(t, *body.Active)
+
+	require.NotNil(t, body.Name)
+	assert.Equal(t, "Ada", *body.Name.GivenName)
+	assert.Equal(t, "Lovelace", *body.Name.FamilyName)
+
+	require.NotNil(t, body.Emails)
+	require.Len(t, *body.Emails, 1)
+	assert.Equal(t, "user@example.com", *(*body.Emails)[0].Value)
+
+	require.NotNil(t, body.Roles)
+	require.Len(t, *body.Roles, 2)
+	assert.Equal(t, "admin", *(*body.Roles)[0].Value)
+	assert.Equal(t, "employee", *(*body.Roles)[1].Value)
+
+	require.NotNil(t, body.ExternalId)
+	assert.Equal(t, "ext-42", *body.ExternalId)
+}
+
+func TestBuildSCIMUserBody_OmitsUnsetOptionalFields(t *testing.T) {
+	cmd := &cobra.Command{}
+	registerSCIMUserFlags(cmd)
+	require.NoError(t, cmd.Flags().Set("username", "user@example.com"))
+
+	body := buildSCIMUserBody(cmd)
+
+	assert.Nil(t, body.Name)
+	assert.Nil(t, body.Emails)
+	assert.Nil(t, body.Roles)
+	assert.Nil(t, body.ExternalId)
 }

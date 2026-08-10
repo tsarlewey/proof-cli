@@ -7,10 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The Proof CLI is a Cobra-based front-end over the generated SDK clients now hosted in [`github.com/tsarlewey/proof-sdk-go`](https://github.com/tsarlewey/proof-sdk-go). All SDK generation, OpenAPI spec management, and per-API client code lives in that repo; this repo only consumes it. Use `make check` (fmt + vet + build + test-race) as the canonical verification command.
 
 ### Recent Changes
+- Upgraded to `proof-sdk-go v0.3.0` and closed the CLI/SDK coverage gap: added `cmd/logs.go` (security events), `cmd/certificates.go` (issue / list / sign / revoke), and `cmd/credentials.go` (Verifiable Credentials authorize URL). Every SDK package now has a CLI surface.
+- The v0.1.0 → v0.3.0 jump changed several call signatures: `activate` / `place-order` now take a request body (exposed as `--suppress-email` and `--require-new-signer-verification`), SCIM bodies moved to `application/scim+json` with `CreateUserWithApplicationScimPlusJSONBodyWithResponse` / `ReplaceUserWithApplicationScimPlusJSONBodyWithResponse`, and SCIM pagination params went `*int32` → `*int`.
+- Removed three `GetUserWithResponse(..., nil)`-style calls where the trailing `nil` had become a variadic `RequestEditorFn` — it would have panicked at request time rather than being ignored.
+- Extracted `registerSCIMUserFlags` / `buildSCIMUserBody` in `cmd/scim.go`; create and update shared ~40 duplicated lines each.
 - Extracted `pkg/sdk/` into its own module, `github.com/tsarlewey/proof-sdk-go`. Imports in `cmd/*.go` now use `github.com/tsarlewey/proof-sdk-go/<pkg>`.
 - Moved SDK generation tooling (Makefile targets, `openapi/` specs, `scripts/fix-openapi-refs.py`, `scripts/fix-scim-operation-ids.py`) to the SDK repo. The CLI Makefile no longer has `generate` / `download-specs` / `regenerate` targets.
 - Added `checkAPIStatus` helper in `cmd/root.go` so SDK calls that return non-2xx responses now exit 1 with the API's error body printed to stderr (previously they exited 0).
-- Earlier cleanup: removed dead `ProofClient` CRUD helpers, `BuildQueryParams`, `Must[T]`, logrus. Consolidated `if err != nil { fmt.Println; os.Exit(1) }` onto `utils.HandleError`. Added `isSuccess`, `parseDateFlag` in `cmd/root.go` and `scimBoolString` in `cmd/scim.go`. Collapsed `NewAuthenticatedDoer` / `NewAuthenticatedDoerWithProvider` into a single `NewAuthenticatedDoer(AuthProvider)` constructor.
+- Earlier cleanup: removed dead `ProofClient` CRUD helpers, `BuildQueryParams`, `Must[T]`, logrus. Consolidated `if err != nil { fmt.Println; os.Exit(1) }` onto `utils.HandleError`. Added `isSuccess`, `parseDateFlag` in `cmd/root.go`. Collapsed `NewAuthenticatedDoer` / `NewAuthenticatedDoerWithProvider` into a single `NewAuthenticatedDoer(AuthProvider)` constructor.
 
 ---
 
@@ -88,6 +92,9 @@ proof-cli/
 │   ├── business.go        # Business API commands
 │   ├── real_estate.go     # Real Estate/Mortgage API commands
 │   ├── scim.go            # SCIM identity management commands
+│   ├── logs.go            # Security event log commands
+│   ├── certificates.go    # Organization certificate commands
+│   ├── credentials.go     # Verifiable Credentials authorize-URL builder
 │   └── example.go         # Example demonstration commands
 ├── pkg/
 │   └── utils/             # Configuration, OAuth helpers, AuthProvider-implementing ProofClient
@@ -99,7 +106,7 @@ SDK generation, OpenAPI specs, and the generated clients live in `github.com/tsa
 
 ### SDK Architecture
 
-SDK clients are imported from `github.com/tsarlewey/proof-sdk-go` (subpackages `business`, `realestate`, `scim`, `logs`, `certificates`, `common`). The SDK repo owns generation via `oapi-codegen`.
+SDK clients are imported from `github.com/tsarlewey/proof-sdk-go` (subpackages `business`, `realestate`, `scim`, `logs`, `certificates`, `credentials`, `common`). The SDK repo owns generation via `oapi-codegen`.
 
 #### Authentication Adapter
 `common.AuthenticatedDoer` (in the SDK repo) wraps any `AuthProvider` (two methods: `AddAuthHeaders(*http.Request) error`, `HTTPClient() *http.Client`) to inject auth headers on every request. `*utils.ProofClient` in this repo implements that interface (`pkg/utils/client.go:138-155`). Usage:
@@ -119,8 +126,12 @@ Clients are lazily initialized in `cmd/root.go`:
 - `getBusinessClient()` - Business API
 - `getRealEstateClient()` - Real Estate/Mortgage API
 - `getSCIMClient()` - SCIM API
+- `getLogsClient()` - Security Events API
+- `getCertificatesClient()` - Organization Certificates API
 
-Each factory wires `common.NewAuthenticatedDoer(proofClient)` into the generated SDK's `WithHTTPClient` option. There is no shared factory — the three look similar but each returns a different concrete SDK type, and the triplication is deliberate (see P1/P2 cleanup guardrails).
+Each factory wires `common.NewAuthenticatedDoer(proofClient)` into the generated SDK's `WithHTTPClient` option. There is no shared factory — they look similar but each returns a different concrete SDK type, and the duplication is deliberate (see P1/P2 cleanup guardrails).
+
+`credentials` has no factory: its single endpoint is a browser redirect, so `cmd/credentials.go` builds and prints the URL with `credentials.NewAuthorizeVerifiableCredentialPresentationRequest` and never issues a request.
 
 #### Shared Command Helpers (`cmd/root.go`)
 - `initializeForAPICall` — lazy `ProofClient` setup; used as `PreRun` on every API-calling command.
@@ -177,11 +188,13 @@ SDK call errors flow through `utils.HandleError(err, "action phrase")` for trans
 
 ## Known Issues
 
-### SCIM Patch Operation Structure
-The upstream SCIM OpenAPI spec defines the PATCH `Operations` field as a single object rather than an array. SCIM requires an array. The workaround in `cmd/scim.go` uses `PatchUserWithBodyWithResponse` with a manually marshaled JSON body (`scimPatchOperation` / `scimPatchRequest` structs) to send a proper array.
+### SCIM Patch Operation Value Type
+The upstream SCIM spec documents the PATCH operation `value` as "an object, array, or string" but generates it as `*map[string]interface{}`, which can't carry array or scalar values. `cmd/scim.go` therefore keeps using `PatchUserWithBodyWithResponse` with a manually marshaled body (`scimPatchOperation` / `scimPatchRequest`).
 
-### SCIM Active-Field Type
-The upstream SCIM spec types the user `active` field as `*string` ("true"/"false") instead of `*bool`. The `scimBoolString(b bool) *string` helper in `cmd/scim.go` bridges the CLI's bool flag to the SDK's string pointer. Keep the helper package-private to `cmd` — this is a SCIM-specific wart and doesn't belong in `pkg/utils`.
+Two earlier SCIM warts were **fixed upstream** as of SDK v0.3.0 and no longer need workarounds: `Operations` is now generated as an array, and `active` is now `*bool` (the old `scimBoolString` helper is gone).
+
+### Certificate Create Property Names
+The Certificates spec literally names two request properties `common_name *required` and `csr *required`, so the generated structs carry those keys and would send them on the wire. `certCreateBody` in `cmd/certificates.go` builds the body by hand with the real keys (`common_name`, `csr`); `cmd/certificates_test.go` guards against a regression to the generated structs.
 
 ---
 

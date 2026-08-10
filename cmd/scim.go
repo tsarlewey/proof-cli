@@ -21,14 +21,74 @@ var scimCmd = &cobra.Command{
 	Long:    `Commands for interacting with the Proof SCIM API for user and identity management`,
 }
 
-// scimBoolString returns a *string of "true" or "false" to match the SCIM
-// SDK's Active field, which is typed *string because the upstream spec is wrong.
-func scimBoolString(b bool) *string {
-	s := "false"
-	if b {
-		s = "true"
+// scimSCIMJSON is the content type SCIM requires on request bodies.
+const scimSCIMJSON = "application/scim+json"
+
+// registerSCIMUserFlags declares the flag set shared by the create and update
+// commands, which is also what buildSCIMUserBody reads.
+func registerSCIMUserFlags(cmd *cobra.Command) {
+	f := cmd.Flags()
+	f.String("username", "", "Username (email address) - required")
+	f.String("given-name", "", "First name")
+	f.String("family-name", "", "Last name")
+	f.String("email", "", "Email address")
+	f.StringSlice("roles", []string{}, "User roles (can specify multiple)")
+	f.String("external-id", "", "External ID from SAML provider")
+	f.Bool("active", true, "Whether the user is active")
+}
+
+// buildSCIMUserBody assembles the user body shared by the create (POST) and
+// update (PUT) commands, both of which send a full user representation.
+func buildSCIMUserBody(cmd *cobra.Command) scim.UserCreationParams {
+	userName, _ := cmd.Flags().GetString("username")
+	givenName, _ := cmd.Flags().GetString("given-name")
+	familyName, _ := cmd.Flags().GetString("family-name")
+	email, _ := cmd.Flags().GetString("email")
+	roles, _ := cmd.Flags().GetStringSlice("roles")
+	externalID, _ := cmd.Flags().GetString("external-id")
+	active, _ := cmd.Flags().GetBool("active")
+
+	if userName == "" {
+		fmt.Println("Error: username is required")
+		os.Exit(1)
 	}
-	return &s
+
+	body := scim.UserCreationParams{UserName: userName, Active: &active}
+
+	if givenName != "" || familyName != "" {
+		body.Name = &struct {
+			FamilyName *string `json:"familyName,omitempty"`
+			GivenName  *string `json:"givenName,omitempty"`
+		}{}
+		if givenName != "" {
+			body.Name.GivenName = &givenName
+		}
+		if familyName != "" {
+			body.Name.FamilyName = &familyName
+		}
+	}
+
+	if email != "" {
+		body.Emails = &[]struct {
+			Value *string `json:"value,omitempty"`
+		}{{Value: &email}}
+	}
+
+	if len(roles) > 0 {
+		values := make([]struct {
+			Value *string `json:"value,omitempty"`
+		}, len(roles))
+		for i := range roles {
+			values[i].Value = &roles[i]
+		}
+		body.Roles = &values
+	}
+
+	if externalID != "" {
+		body.ExternalId = &externalID
+	}
+
+	return body
 }
 
 // scimPatchOperation is a single SCIM PATCH operation as sent to the server.
@@ -104,12 +164,10 @@ var scimListUsersCmd = &cobra.Command{
 
 		params := &scim.ListUsersParams{}
 		if startIndex > 0 {
-			si := int32(startIndex)
-			params.StartIndex = &si
+			params.StartIndex = &startIndex
 		}
 		if count > 0 {
-			c := int32(count)
-			params.Count = &c
+			params.Count = &count
 		}
 
 		// Make API call using SDK client
@@ -135,7 +193,7 @@ var scimGetUserCmd = &cobra.Command{
 
 		// Make API call using SDK client
 		client := getSCIMClient()
-		resp, err := client.GetUserWithResponse(context.Background(), organizationID, userID, nil)
+		resp, err := client.GetUserWithResponse(context.Background(), organizationID, userID)
 		utils.HandleError(err, "getting user")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "getting user")
 
@@ -153,59 +211,12 @@ var scimCreateUserCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		organizationID := args[0]
 
-		// Get command line flags
-		userName, _ := cmd.Flags().GetString("username")
-		givenName, _ := cmd.Flags().GetString("given-name")
-		familyName, _ := cmd.Flags().GetString("family-name")
-		email, _ := cmd.Flags().GetString("email")
-		roles, _ := cmd.Flags().GetStringSlice("roles")
-		externalID, _ := cmd.Flags().GetString("external-id")
-		active, _ := cmd.Flags().GetBool("active")
-
-		if userName == "" {
-			fmt.Println("Error: username is required")
-			os.Exit(1)
-		}
-
-		body := scim.CreateUserJSONRequestBody{
-			UserName: userName,
-		}
-
-		body.Active = scimBoolString(active)
-
-		// Add name if provided
-		if givenName != "" || familyName != "" {
-			body.Name = &struct {
-				FamilyName *string `json:"familyName,omitempty"`
-				GivenName  *string `json:"givenName,omitempty"`
-			}{}
-			if givenName != "" {
-				body.Name.GivenName = &givenName
-			}
-			if familyName != "" {
-				body.Name.FamilyName = &familyName
-			}
-		}
-
-		// Add email if provided
-		if email != "" {
-			emails := []string{email}
-			body.Emails = &emails
-		}
-
-		// Add roles if provided
-		if len(roles) > 0 {
-			body.Roles = &roles
-		}
-
-		// Add external ID if provided
-		if externalID != "" {
-			body.ExternalId = &externalID
-		}
+		body := buildSCIMUserBody(cmd)
 
 		// Make API call using SDK client
 		client := getSCIMClient()
-		resp, err := client.CreateUserWithResponse(context.Background(), organizationID, nil, body)
+		resp, err := client.CreateUserWithApplicationScimPlusJSONBodyWithResponse(
+			context.Background(), organizationID, body)
 		utils.HandleError(err, "creating user")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "creating user")
 
@@ -224,59 +235,12 @@ var scimUpdateUserCmd = &cobra.Command{
 		organizationID := args[0]
 		userID := args[1]
 
-		// Get command line flags
-		userName, _ := cmd.Flags().GetString("username")
-		givenName, _ := cmd.Flags().GetString("given-name")
-		familyName, _ := cmd.Flags().GetString("family-name")
-		email, _ := cmd.Flags().GetString("email")
-		roles, _ := cmd.Flags().GetStringSlice("roles")
-		externalID, _ := cmd.Flags().GetString("external-id")
-		active, _ := cmd.Flags().GetBool("active")
-
-		if userName == "" {
-			fmt.Println("Error: username is required")
-			os.Exit(1)
-		}
-
-		body := scim.UpdateUserJSONRequestBody{
-			UserName: userName,
-		}
-
-		body.Active = scimBoolString(active)
-
-		// Add name if provided
-		if givenName != "" || familyName != "" {
-			body.Name = &struct {
-				FamilyName *string `json:"familyName,omitempty"`
-				GivenName  *string `json:"givenName,omitempty"`
-			}{}
-			if givenName != "" {
-				body.Name.GivenName = &givenName
-			}
-			if familyName != "" {
-				body.Name.FamilyName = &familyName
-			}
-		}
-
-		// Add email if provided
-		if email != "" {
-			emails := []string{email}
-			body.Emails = &emails
-		}
-
-		// Add roles if provided
-		if len(roles) > 0 {
-			body.Roles = &roles
-		}
-
-		// Add external ID if provided
-		if externalID != "" {
-			body.ExternalId = &externalID
-		}
+		body := buildSCIMUserBody(cmd)
 
 		// Make API call using SDK client
 		client := getSCIMClient()
-		resp, err := client.UpdateUserWithResponse(context.Background(), organizationID, userID, nil, body)
+		resp, err := client.ReplaceUserWithApplicationScimPlusJSONBodyWithResponse(
+			context.Background(), organizationID, userID, body)
 		utils.HandleError(err, "updating user")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "updating user")
 
@@ -307,8 +271,7 @@ var scimPatchUserCmd = &cobra.Command{
 			context.Background(),
 			organizationID,
 			userID,
-			nil,
-			"application/json",
+			scimSCIMJSON,
 			bytes.NewReader(bodyBytes),
 		)
 		utils.HandleError(err, "patching user")
@@ -330,7 +293,7 @@ var scimDeleteUserCmd = &cobra.Command{
 
 		// Make API call using SDK client
 		client := getSCIMClient()
-		resp, err := client.DeleteUserWithResponse(context.Background(), organizationID, userID, nil)
+		resp, err := client.DeleteUserWithResponse(context.Background(), organizationID, userID)
 		utils.HandleError(err, "deleting user")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "deleting user")
 
@@ -433,25 +396,12 @@ func init() {
 	scimListUsersCmd.Flags().Int("start-index", 1, "1-based index of first result")
 	scimListUsersCmd.Flags().Int("count", 50, "Maximum number of results per page")
 
-	// Add flags for user create
-	scimCreateUserCmd.Flags().String("username", "", "Username (email address) - required")
-	scimCreateUserCmd.Flags().String("given-name", "", "First name")
-	scimCreateUserCmd.Flags().String("family-name", "", "Last name")
-	scimCreateUserCmd.Flags().String("email", "", "Email address")
-	scimCreateUserCmd.Flags().StringSlice("roles", []string{}, "User roles (can specify multiple)")
-	scimCreateUserCmd.Flags().String("external-id", "", "External ID from SAML provider")
-	scimCreateUserCmd.Flags().Bool("active", true, "Whether the user is active")
-	scimCreateUserCmd.MarkFlagRequired("username")
-
-	// Add flags for user update
-	scimUpdateUserCmd.Flags().String("username", "", "Username (email address) - required")
-	scimUpdateUserCmd.Flags().String("given-name", "", "First name")
-	scimUpdateUserCmd.Flags().String("family-name", "", "Last name")
-	scimUpdateUserCmd.Flags().String("email", "", "Email address")
-	scimUpdateUserCmd.Flags().StringSlice("roles", []string{}, "User roles (can specify multiple)")
-	scimUpdateUserCmd.Flags().String("external-id", "", "External ID from SAML provider")
-	scimUpdateUserCmd.Flags().Bool("active", true, "Whether the user is active")
-	scimUpdateUserCmd.MarkFlagRequired("username")
+	// Create and update both send a full user representation, so they take the
+	// same flag set — see buildSCIMUserBody.
+	for _, c := range []*cobra.Command{scimCreateUserCmd, scimUpdateUserCmd} {
+		registerSCIMUserFlags(c)
+		c.MarkFlagRequired("username")
+	}
 
 	// Add flags for user patch
 	scimPatchUserCmd.Flags().StringSlice("operation", []string{}, "PATCH operations in format 'op:path[:value]' (e.g., 'replace:active:false')")

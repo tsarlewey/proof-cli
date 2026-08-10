@@ -7,7 +7,7 @@ toolchain go1.24.4
 require (
 	github.com/fatih/color v1.18.0
 	github.com/spf13/cobra v1.7.0
-	github.com/tsarlewey/proof-sdk-go v0.1.0
+	github.com/tsarlewey/proof-sdk-go v0.3.0
 )
 
 require github.com/stretchr/testify v1.11.1

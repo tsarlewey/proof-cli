@@ -177,13 +177,20 @@ var bizActivateTransactionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		transactionID := args[0]
 
+		suppressEmail, _ := cmd.Flags().GetBool("suppress-email")
+		requireVerification, _ := cmd.Flags().GetBool("require-new-signer-verification")
+
 		params := &business.ActivateDraftTransactionParams{
 			DocumentUrlVersion: utils.Ptr(business.ActivateDraftTransactionParamsDocumentUrlVersionV2),
+		}
+		body := business.ActivateDraftTransactionJSONRequestBody{
+			SuppressEmail:                &suppressEmail,
+			RequireNewSignerVerification: &requireVerification,
 		}
 
 		// Make API call using SDK
 		client := getBusinessClient()
-		resp, err := client.ActivateDraftTransactionWithResponse(context.Background(), transactionID, params)
+		resp, err := client.ActivateDraftTransactionWithResponse(context.Background(), transactionID, params, body)
 		utils.HandleError(err, "activating transaction")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "activating transaction")
 
@@ -903,6 +910,8 @@ func init() {
 	bizTransactionsCmd.AddCommand(bizCreateTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizDeleteTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizActivateTransactionCmd)
+	bizActivateTransactionCmd.Flags().Bool("suppress-email", false, "Don't email the signer on activation (you must supply transaction_access_link yourself)")
+	bizActivateTransactionCmd.Flags().Bool("require-new-signer-verification", false, "Require the signer to verify email ownership")
 	bizTransactionsCmd.AddCommand(bizRecallTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizResendEmailCmd)
 	bizTransactionsCmd.AddCommand(bizResendSMSCmd)
