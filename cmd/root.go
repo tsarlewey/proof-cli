@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -286,6 +288,33 @@ func parseDateFlag(flagName, value, layout string) *time.Time {
 		os.Exit(1)
 	}
 	return &t
+}
+
+// boolFlagIfSet returns a pointer to a bool flag's value only when the user
+// actually passed it. An unset bool flag is false, and sending an explicit
+// false would override the organization's own default for that setting, so
+// omitting it from the request body is the only way to mean "leave it alone".
+func boolFlagIfSet(cmd *cobra.Command, name string) *bool {
+	if !cmd.Flags().Changed(name) {
+		return nil
+	}
+	v, _ := cmd.Flags().GetBool(name)
+	return &v
+}
+
+// enumFlag returns a pointer to a string flag's value, validated against the
+// values the API accepts. Returns nil when the flag is empty. A typo exits
+// with the valid set listed, rather than an opaque 400 from the server.
+func enumFlag(cmd *cobra.Command, name string, allowed ...string) *string {
+	v, _ := cmd.Flags().GetString(name)
+	if v == "" {
+		return nil
+	}
+	if !slices.Contains(allowed, v) {
+		fmt.Fprintf(os.Stderr, "Error: invalid --%s %q (valid: %s)\n", name, v, strings.Join(allowed, ", "))
+		os.Exit(1)
+	}
+	return &v
 }
 
 func init() {

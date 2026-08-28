@@ -5,6 +5,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tsarlewey/proof-cli/pkg/utils"
@@ -99,24 +102,20 @@ var bizCreateTransactionCmd = &cobra.Command{
 	PreRun:     initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		email, _ := cmd.Flags().GetString("email")
-		firstName, _ := cmd.Flags().GetString("first-name")
-		lastName, _ := cmd.Flags().GetString("last-name")
-		documentPath, _ := cmd.Flags().GetString("document")
-		transactionName, _ := cmd.Flags().GetString("name")
-		draft, _ := cmd.Flags().GetBool("draft")
-		transactionType, _ := cmd.Flags().GetString("type")
+		documentPaths, _ := cmd.Flags().GetStringSlice("document")
 
-		if email == "" || documentPath == "" {
+		if email == "" || len(documentPaths) == 0 {
 			fmt.Println("Error: email and document are required")
 			os.Exit(1)
 		}
 
-		// Read the document file
-		documentData, err := os.ReadFile(documentPath)
-		utils.HandleError(err, "reading document file")
-
-		// Encode document to base64
-		documentBase64 := base64.StdEncoding.EncodeToString(documentData)
+		// Read and base64-encode each document
+		documents := make([]string, len(documentPaths))
+		for i, path := range documentPaths {
+			documentData, err := os.ReadFile(path)
+			utils.HandleError(err, "reading document file")
+			documents[i] = base64.StdEncoding.EncodeToString(documentData)
+		}
 
 		// Build query parameters
 		queryParams := &business.CreateTransactionParams{
@@ -125,16 +124,10 @@ var bizCreateTransactionCmd = &cobra.Command{
 
 		// Build request body
 		body := business.CreateTransactionJSONRequestBody{
-			Signer: business.Signer{
-				Email:     email,
-				FirstName: utils.PtrIfNotEmpty(firstName),
-				LastName:  utils.PtrIfNotEmpty(lastName),
-			},
-			Documents:       utils.Ptr([]string{documentBase64}),
-			Draft:           utils.Ptr(draft),
-			TransactionName: utils.PtrIfNotEmpty(transactionName),
-			TransactionType: utils.PtrIfNotEmpty(transactionType),
+			Signer:    business.Signer{Email: email},
+			Documents: utils.Ptr(documents),
 		}
+		applyTransactionParams(cmd, &body)
 
 		// Make API call using SDK
 		client := getBusinessClient()
@@ -957,24 +950,7 @@ func init() {
 	bizListTransactionsCmd.Flags().String("last-updated-start", "", "Filter by last updated date start (YYYY-MM-DD)")
 	bizListTransactionsCmd.Flags().String("last-updated-end", "", "Filter by last updated date end (YYYY-MM-DD)")
 
-	bizCreateTransactionCmd.Flags().String("email", "", "Signer's email address (required)")
-	bizCreateTransactionCmd.Flags().String("first-name", "", "Signer's first name")
-	bizCreateTransactionCmd.Flags().String("last-name", "", "Signer's last name")
-	bizCreateTransactionCmd.Flags().String("document", "", "Path to document file (required)")
-	bizCreateTransactionCmd.Flags().String("name", "", "Transaction name")
-	bizCreateTransactionCmd.Flags().String("type", "", "Transaction type")
-	bizCreateTransactionCmd.Flags().Bool("draft", false, "Create transaction as draft")
-	bizCreateTransactionCmd.Flags().String("middle-name", "", "Signer's middle name")
-	bizCreateTransactionCmd.Flags().String("phone-number", "", "Signer's phone number")
-	bizCreateTransactionCmd.Flags().String("message-to-signer", "", "Message to signer (GitHub Flavored Markdown)")
-	bizCreateTransactionCmd.Flags().String("message-subject", "", "Email subject line")
-	bizCreateTransactionCmd.Flags().String("activation-time", "", "ISO-8601 datetime when signer can connect with notary")
-	bizCreateTransactionCmd.Flags().String("expiry", "", "ISO-8601 datetime after which transaction expires")
-	bizCreateTransactionCmd.Flags().Bool("suppress-email", false, "Don't send notification email on activation")
-	bizCreateTransactionCmd.Flags().String("auth-requirement", "", "Authentication requirement (sms or none)")
-	bizCreateTransactionCmd.Flags().Bool("require-secondary-photo-id", false, "Require two forms of photo ID")
-	bizCreateTransactionCmd.Flags().String("payer", "", "Who pays for the transaction (signer or sender)")
-	bizCreateTransactionCmd.Flags().String("external-id", "", "External system ID")
+	registerTransactionParamFlags(bizCreateTransactionCmd)
 
 	// Add flags for document commands
 	bizAddDocumentCmd.Flags().String("filename", "", "Plain language name for the document")
@@ -1038,4 +1014,169 @@ func init() {
 	bizRecallTransactionCmd.Flags().String("reason", "", "Optional reason for recalling the transaction")
 	bizResendEmailCmd.Flags().String("message", "", "Optional message to signer")
 	bizResendSMSCmd.Flags().String("phone-number", "", "Optional phone number to send SMS to")
+}
+
+// registerTransactionParamFlags registers the top-level parameters the
+// Business API accepts when creating a transaction. Nested signer fields
+// beyond the scalars here, and multi-signer transactions, don't reduce to
+// flags — those need the API directly.
+func registerTransactionParamFlags(cmd *cobra.Command) {
+	f := cmd.Flags()
+
+	// Signer and documents
+	f.String("email", "", "Signer's email address (required)")
+	f.String("first-name", "", "Signer's first name")
+	f.String("last-name", "", "Signer's last name")
+	f.String("middle-name", "", "Signer's middle name")
+	f.String("phone-number", "", "Signer's phone number")
+	f.StringSlice("document", nil, "Path to a document file; repeat for multiple (required)")
+
+	// Transaction
+	f.String("name", "", "Transaction name")
+	f.String("type", "", "Transaction type")
+	f.Bool("draft", false, "Create transaction as draft")
+	f.String("activation-time", "", "ISO-8601 datetime when signer can connect with notary")
+	f.String("expiry", "", "ISO-8601 datetime after which transaction expires")
+	f.String("external-id", "", "External system ID")
+	f.String("config-id", "", "Transaction configuration ID")
+	f.String("organization-id", "", "Create on behalf of a child organization")
+	f.String("payer", "", "Who pays for the transaction (signer or sender)")
+	f.Bool("pdf-bookmarked", false, "Split the uploaded PDF into documents by its bookmarks")
+
+	// Identity and notarization
+	f.String("auth-requirement", "", "Authentication requirement (sms or none)")
+	f.String("idv-use-case", "", "Identity verification use case (STANDARD or ACCOUNT_RECOVERY)")
+	f.Bool("require-secondary-photo-id", false, "Require two forms of photo ID")
+	f.Bool("require-new-signer-verification", false, "Require the signer to verify email ownership")
+	f.String("notary-id", "", "Assign a specific notary by ID")
+	f.String("notary-meeting-time", "", "Scheduled notary meeting time (RFC 3339)")
+	f.StringSlice("notary-note", nil, "Instruction note for the notary; repeat for multiple")
+	f.StringSlice("allowed-notary-states", nil, "Two-letter state codes the notary may be commissioned in")
+
+	// Communications
+	f.Bool("suppress-email", false, "Don't send notification email on activation")
+	f.String("message-subject", "", "Email subject line")
+	f.String("message-to-signer", "", "Message to signer (GitHub Flavored Markdown)")
+	f.String("message-signature", "", "Signature block appended to notification emails")
+	f.StringSlice("cc-recipient-emails", nil, "Email addresses to CC on transaction notifications")
+	f.String("redirect-url", "", "URL to send the signer to after completion")
+	f.String("redirect-message", "", "Message shown to the signer before redirecting")
+	f.StringSlice("recipient-details-config", nil, "Recipient field display rule as field=display (e.g. name=locked)")
+
+	// Cosigner
+	f.String("cosigner-first-name", "", "Cosigner's first name")
+	f.String("cosigner-last-name", "", "Cosigner's last name")
+	f.String("cosigner-signing-requirement", "", "Cosigner signing requirement (esign, identify, or verify)")
+}
+
+// applyTransactionParams fills body from the flags registered by
+// registerTransactionParamFlags. Every optional field stays nil unless the
+// user passed its flag, so the API applies organization defaults for the rest.
+// Signer.Email and Documents are set by the caller — they're required.
+func applyTransactionParams(cmd *cobra.Command, body *business.TransactionCreateParams) {
+	f := cmd.Flags()
+	str := func(name string) *string {
+		v, _ := f.GetString(name)
+		return utils.PtrIfNotEmpty(v)
+	}
+	slice := func(name string) *[]string {
+		v, _ := f.GetStringSlice(name)
+		if len(v) == 0 {
+			return nil
+		}
+		return &v
+	}
+
+	body.Signer.FirstName = str("first-name")
+	body.Signer.LastName = str("last-name")
+	body.Signer.MiddleName = str("middle-name")
+	body.Signer.PhoneNumber = str("phone-number")
+
+	// draft has always been sent explicitly; keep it that way so omitting the
+	// flag keeps meaning "not a draft" rather than deferring to the API.
+	draft, _ := f.GetBool("draft")
+	body.Draft = utils.Ptr(draft)
+
+	body.TransactionName = str("name")
+	body.TransactionType = str("type")
+	body.ActivationTime = str("activation-time")
+	body.Expiry = str("expiry")
+	body.ExternalId = str("external-id")
+	body.ConfigId = str("config-id")
+	body.OrganizationId = str("organization-id")
+	body.NotaryId = str("notary-id")
+	body.MessageSubject = str("message-subject")
+	body.MessageToSigner = str("message-to-signer")
+	body.MessageSignature = str("message-signature")
+
+	body.PdfBookmarked = boolFlagIfSet(cmd, "pdf-bookmarked")
+	body.RequireSecondaryPhotoId = boolFlagIfSet(cmd, "require-secondary-photo-id")
+	body.RequireNewSignerVerification = boolFlagIfSet(cmd, "require-new-signer-verification")
+	body.SuppressEmail = boolFlagIfSet(cmd, "suppress-email")
+
+	body.AllowedNotaryStates = slice("allowed-notary-states")
+	body.CcRecipientEmails = slice("cc-recipient-emails")
+
+	meetingTime, _ := f.GetString("notary-meeting-time")
+	body.NotaryMeetingTime = parseDateFlag("notary-meeting-time", meetingTime, time.RFC3339)
+
+	if v := enumFlag(cmd, "auth-requirement", "sms", "none"); v != nil {
+		body.AuthenticationRequirement = utils.Ptr(business.TransactionCreateParamsAuthenticationRequirement(*v))
+	}
+	if v := enumFlag(cmd, "idv-use-case", "STANDARD", "ACCOUNT_RECOVERY"); v != nil {
+		body.IdvUseCase = utils.Ptr(business.TransactionCreateParamsIdvUseCase(*v))
+	}
+	if v := enumFlag(cmd, "payer", "signer", "sender"); v != nil {
+		body.Payer = utils.Ptr(business.TransactionCreateParamsPayer(*v))
+	}
+
+	if notes, _ := f.GetStringSlice("notary-note"); len(notes) > 0 {
+		instructions := make([]business.NotaryInstructions, len(notes))
+		for i := range notes {
+			instructions[i].NotaryNote = &notes[i]
+		}
+		body.NotaryInstructions = &instructions
+	}
+
+	if configs := parseRecipientDetailsConfig(cmd); len(configs) > 0 {
+		body.RecipientDetailsConfig = &configs
+	}
+
+	redirectURL, redirectMessage := str("redirect-url"), str("redirect-message")
+	if redirectURL != nil || redirectMessage != nil {
+		body.Redirect = &business.Redirect{Url: redirectURL, Message: redirectMessage}
+	}
+
+	cosignerFirst, cosignerLast := str("cosigner-first-name"), str("cosigner-last-name")
+	cosignerReq := enumFlag(cmd, "cosigner-signing-requirement", "esign", "identify", "verify")
+	if cosignerFirst != nil || cosignerLast != nil || cosignerReq != nil {
+		body.Cosigner = &business.Cosigner{FirstName: cosignerFirst, LastName: cosignerLast}
+		if cosignerReq != nil {
+			body.Cosigner.SigningRequirement = utils.Ptr(business.CosignerSigningRequirement(*cosignerReq))
+		}
+	}
+}
+
+// parseRecipientDetailsConfig parses --recipient-details-config entries of the
+// form "field=display", e.g. "name=locked".
+func parseRecipientDetailsConfig(cmd *cobra.Command) []business.RecipientDetailsConfig {
+	raw, _ := cmd.Flags().GetStringSlice("recipient-details-config")
+	fields := []string{"name"}
+	displays := []string{"required", "locked", "optional", "hidden"}
+
+	configs := make([]business.RecipientDetailsConfig, 0, len(raw))
+	for _, entry := range raw {
+		field, display, ok := strings.Cut(entry, "=")
+		if !ok || !slices.Contains(fields, field) || !slices.Contains(displays, display) {
+			fmt.Fprintf(os.Stderr,
+				"Error: invalid --recipient-details-config %q (want field=display; fields: %s; displays: %s)\n",
+				entry, strings.Join(fields, ", "), strings.Join(displays, ", "))
+			os.Exit(1)
+		}
+		configs = append(configs, business.RecipientDetailsConfig{
+			Field:   utils.Ptr(business.RecipientDetailsConfigField(field)),
+			Display: utils.Ptr(business.RecipientDetailsConfigDisplay(display)),
+		})
+	}
+	return configs
 }
