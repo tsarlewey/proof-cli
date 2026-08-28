@@ -101,6 +101,22 @@ proof business transactions create \
   --name "Contract Signing" \
   --draft
 
+# Multiple documents, scheduled notary meeting, and a redirect
+proof business transactions create \
+  --email "signer@example.com" \
+  --document "/path/to/deed.pdf" \
+  --document "/path/to/rider.pdf" \
+  --notary-meeting-time "2026-09-02T15:30:00Z" \
+  --allowed-notary-states "CA,NY" \
+  --notary-note "Verify the property address" \
+  --payer sender \
+  --idv-use-case ACCOUNT_RECOVERY \
+  --recipient-details-config "name=locked" \
+  --redirect-url "https://example.com/done"
+
+# See the full parameter set
+proof business transactions create --help
+
 # Activate a draft transaction
 proof business transactions activate <transaction-id>
 
