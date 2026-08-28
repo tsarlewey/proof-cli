@@ -302,6 +302,18 @@ func boolFlagIfSet(cmd *cobra.Command, name string) *bool {
 	return &v
 }
 
+// anyFlagChanged reports whether the user passed any of the named flags. Used
+// to decide whether an optional nested object belongs in the request body at
+// all, rather than sending one built entirely from zero values.
+func anyFlagChanged(cmd *cobra.Command, names ...string) bool {
+	for _, name := range names {
+		if cmd.Flags().Changed(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // enumFlag returns a pointer to a string flag's value, validated against the
 // values the API accepts. Returns nil when the flag is empty. A typo exits
 // with the valid set listed, rather than an opaque 400 from the server.

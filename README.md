@@ -114,6 +114,26 @@ proof business transactions create \
   --recipient-details-config "name=locked" \
   --redirect-url "https://example.com/done"
 
+# Multiple signers, from a JSON file holding an array of signer objects
+# (max 10, each needs at least an email). --email stays the primary signer.
+proof business transactions create \
+  --email "primary@example.com" \
+  --document "/path/to/document.pdf" \
+  --signers-file ./signers.json
+
+# Replace a draft transaction (PUT) -- anything you omit reverts to default
+proof business transactions update <transaction-id> \
+  --name "Contract Signing (revised)" \
+  --expiry "2026-09-08T10:00:00Z"
+
+# Change individual fields and leave the rest alone (PATCH)
+proof business transactions patch <transaction-id> --expiry "2026-09-15T10:00:00Z"
+
+# Reorder documents already attached to a draft
+proof business transactions patch <transaction-id> \
+  --document-order "doc_abc123=1" \
+  --document-order "doc_def456=2"
+
 # See the full parameter set
 proof business transactions create --help
 

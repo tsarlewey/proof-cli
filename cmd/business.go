@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,11 +125,11 @@ var bizCreateTransactionCmd = &cobra.Command{
 		}
 
 		// Build request body
-		body := business.CreateTransactionJSONRequestBody{
-			Signer:    business.Signer{Email: email},
-			Documents: utils.Ptr(documents),
-		}
-		applyTransactionParams(cmd, &body)
+		body := toCreateParams(buildTransactionParams(cmd))
+		body.Signer.Email = email
+		body.Documents = utils.Ptr(documents)
+		draft, _ := cmd.Flags().GetBool("draft")
+		body.Draft = utils.Ptr(draft)
 
 		// Make API call using SDK
 		client := getBusinessClient()
@@ -292,6 +294,62 @@ var bizGetEligibleNotariesCmd = &cobra.Command{
 }
 
 // Business Documents Commands
+var bizUpdateTransactionCmd = &cobra.Command{
+	Use:   "update <transaction-id>",
+	Short: "Replace a draft transaction",
+	Long: `Replace a draft transaction with the values you supply (HTTP PUT).
+
+Any parameter you don't pass is cleared to the API's default. Use "patch" to
+change individual fields and leave the rest alone.`,
+	Args:   cobra.ExactArgs(1),
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		body := buildTransactionParams(cmd)
+		if order := parseDocumentOrder(cmd); len(order) > 0 {
+			body.Documents = &order
+		}
+
+		params := &business.UpdateDraftTransactionParams{
+			DocumentUrlVersion: utils.Ptr(business.UpdateDraftTransactionParamsDocumentUrlVersionV2),
+		}
+
+		client := getBusinessClient()
+		resp, err := client.UpdateDraftTransactionWithResponse(context.Background(), args[0], params, body)
+		utils.HandleError(err, "updating transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "updating transaction")
+
+		PrintResponse(resp.Body)
+	},
+}
+
+var bizPatchTransactionCmd = &cobra.Command{
+	Use:   "patch <transaction-id>",
+	Short: "Update individual fields on a draft transaction",
+	Long: `Update a draft transaction in place (HTTP PATCH).
+
+Only the parameters you pass are sent; everything else keeps its current
+value. Use "update" to replace the whole transaction.`,
+	Args:   cobra.ExactArgs(1),
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		body := buildTransactionParams(cmd)
+		if order := parseDocumentOrder(cmd); len(order) > 0 {
+			body.Documents = &order
+		}
+
+		params := &business.PatchDraftTransactionParams{
+			DocumentUrlVersion: utils.Ptr(business.PatchDraftTransactionParamsDocumentUrlVersionV2),
+		}
+
+		client := getBusinessClient()
+		resp, err := client.PatchDraftTransactionWithResponse(context.Background(), args[0], params, body)
+		utils.HandleError(err, "patching transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "patching transaction")
+
+		PrintResponse(resp.Body)
+	},
+}
+
 var bizDocumentsCmd = &cobra.Command{
 	Use:     "documents",
 	Aliases: []string{"d", "docs"},
@@ -901,6 +959,8 @@ func init() {
 	bizTransactionsCmd.AddCommand(bizListTransactionsCmd)
 	bizTransactionsCmd.AddCommand(bizGetTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizCreateTransactionCmd)
+	bizTransactionsCmd.AddCommand(bizUpdateTransactionCmd)
+	bizTransactionsCmd.AddCommand(bizPatchTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizDeleteTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizActivateTransactionCmd)
 	bizActivateTransactionCmd.Flags().Bool("suppress-email", false, "Don't email the signer on activation (you must supply transaction_access_link yourself)")
@@ -951,6 +1011,13 @@ func init() {
 	bizListTransactionsCmd.Flags().String("last-updated-end", "", "Filter by last updated date end (YYYY-MM-DD)")
 
 	registerTransactionParamFlags(bizCreateTransactionCmd)
+	bizCreateTransactionCmd.Flags().StringSlice("document", nil, "Path to a document file; repeat for multiple (required)")
+	bizCreateTransactionCmd.Flags().Bool("draft", false, "Create transaction as draft")
+
+	for _, cmd := range []*cobra.Command{bizUpdateTransactionCmd, bizPatchTransactionCmd} {
+		registerTransactionParamFlags(cmd)
+		cmd.Flags().StringSlice("document-order", nil, "Reposition an attached document as id=position (e.g. doc_abc123=1)")
+	}
 
 	// Add flags for document commands
 	bizAddDocumentCmd.Flags().String("filename", "", "Plain language name for the document")
@@ -1016,30 +1083,29 @@ func init() {
 	bizResendSMSCmd.Flags().String("phone-number", "", "Optional phone number to send SMS to")
 }
 
-// registerTransactionParamFlags registers the top-level parameters the
-// Business API accepts when creating a transaction. Nested signer fields
-// beyond the scalars here, and multi-signer transactions, don't reduce to
-// flags — those need the API directly.
+// registerTransactionParamFlags registers the transaction parameters shared by
+// create, update, and patch. Callers add the flags specific to their verb:
+// --document (file uploads) on create, --document-order on update/patch.
 func registerTransactionParamFlags(cmd *cobra.Command) {
 	f := cmd.Flags()
 
-	// Signer and documents
-	f.String("email", "", "Signer's email address (required)")
+	// Primary signer. The API takes one `signer` plus an optional `signers`
+	// array; --signers-file supplies the latter.
+	f.String("email", "", "Primary signer's email address (required on create)")
 	f.String("first-name", "", "Signer's first name")
 	f.String("last-name", "", "Signer's last name")
 	f.String("middle-name", "", "Signer's middle name")
 	f.String("phone-number", "", "Signer's phone number")
-	f.StringSlice("document", nil, "Path to a document file; repeat for multiple (required)")
+	f.String("signers-file", "", "Path to a JSON file holding an array of additional signer objects (max 10)")
 
 	// Transaction
 	f.String("name", "", "Transaction name")
 	f.String("type", "", "Transaction type")
-	f.Bool("draft", false, "Create transaction as draft")
 	f.String("activation-time", "", "ISO-8601 datetime when signer can connect with notary")
 	f.String("expiry", "", "ISO-8601 datetime after which transaction expires")
 	f.String("external-id", "", "External system ID")
 	f.String("config-id", "", "Transaction configuration ID")
-	f.String("organization-id", "", "Create on behalf of a child organization")
+	f.String("organization-id", "", "Act on behalf of a child organization")
 	f.String("payer", "", "Who pays for the transaction (signer or sender)")
 	f.Bool("pdf-bookmarked", false, "Split the uploaded PDF into documents by its bookmarks")
 
@@ -1069,11 +1135,16 @@ func registerTransactionParamFlags(cmd *cobra.Command) {
 	f.String("cosigner-signing-requirement", "", "Cosigner signing requirement (esign, identify, or verify)")
 }
 
-// applyTransactionParams fills body from the flags registered by
-// registerTransactionParamFlags. Every optional field stays nil unless the
-// user passed its flag, so the API applies organization defaults for the rest.
-// Signer.Email and Documents are set by the caller — they're required.
-func applyTransactionParams(cmd *cobra.Command, body *business.TransactionCreateParams) {
+// signerFlags are the flags that populate the primary `signer` object. The
+// object is only sent when at least one of them was passed.
+var signerFlags = []string{"email", "first-name", "last-name", "middle-name", "phone-number"}
+
+// buildTransactionParams assembles the transaction body shared by create,
+// update, and patch from the flags registered by registerTransactionParamFlags.
+// Every optional field stays nil unless the user passed its flag, so the API
+// applies organization defaults for the rest. Documents are the caller's job:
+// create uploads them, update/patch reorder them.
+func buildTransactionParams(cmd *cobra.Command) business.TransactionParams {
 	f := cmd.Flags()
 	str := func(name string) *string {
 		v, _ := f.GetString(name)
@@ -1087,47 +1158,55 @@ func applyTransactionParams(cmd *cobra.Command, body *business.TransactionCreate
 		return &v
 	}
 
-	body.Signer.FirstName = str("first-name")
-	body.Signer.LastName = str("last-name")
-	body.Signer.MiddleName = str("middle-name")
-	body.Signer.PhoneNumber = str("phone-number")
+	body := business.TransactionParams{
+		TransactionName:  str("name"),
+		TransactionType:  str("type"),
+		ActivationTime:   str("activation-time"),
+		Expiry:           str("expiry"),
+		ExternalId:       str("external-id"),
+		ConfigId:         str("config-id"),
+		OrganizationId:   str("organization-id"),
+		NotaryId:         str("notary-id"),
+		MessageSubject:   str("message-subject"),
+		MessageToSigner:  str("message-to-signer"),
+		MessageSignature: str("message-signature"),
 
-	// draft has always been sent explicitly; keep it that way so omitting the
-	// flag keeps meaning "not a draft" rather than deferring to the API.
-	draft, _ := f.GetBool("draft")
-	body.Draft = utils.Ptr(draft)
+		PdfBookmarked:                boolFlagIfSet(cmd, "pdf-bookmarked"),
+		RequireSecondaryPhotoId:      boolFlagIfSet(cmd, "require-secondary-photo-id"),
+		RequireNewSignerVerification: boolFlagIfSet(cmd, "require-new-signer-verification"),
+		SuppressEmail:                boolFlagIfSet(cmd, "suppress-email"),
 
-	body.TransactionName = str("name")
-	body.TransactionType = str("type")
-	body.ActivationTime = str("activation-time")
-	body.Expiry = str("expiry")
-	body.ExternalId = str("external-id")
-	body.ConfigId = str("config-id")
-	body.OrganizationId = str("organization-id")
-	body.NotaryId = str("notary-id")
-	body.MessageSubject = str("message-subject")
-	body.MessageToSigner = str("message-to-signer")
-	body.MessageSignature = str("message-signature")
+		AllowedNotaryStates: slice("allowed-notary-states"),
+		CcRecipientEmails:   slice("cc-recipient-emails"),
+	}
 
-	body.PdfBookmarked = boolFlagIfSet(cmd, "pdf-bookmarked")
-	body.RequireSecondaryPhotoId = boolFlagIfSet(cmd, "require-secondary-photo-id")
-	body.RequireNewSignerVerification = boolFlagIfSet(cmd, "require-new-signer-verification")
-	body.SuppressEmail = boolFlagIfSet(cmd, "suppress-email")
-
-	body.AllowedNotaryStates = slice("allowed-notary-states")
-	body.CcRecipientEmails = slice("cc-recipient-emails")
+	if anyFlagChanged(cmd, signerFlags...) {
+		signer := business.Signer{
+			FirstName:   str("first-name"),
+			LastName:    str("last-name"),
+			MiddleName:  str("middle-name"),
+			PhoneNumber: str("phone-number"),
+		}
+		if email := str("email"); email != nil {
+			signer.Email = *email
+		}
+		body.Signer = &signer
+	}
+	if signers := parseSignersFile(cmd); len(signers) > 0 {
+		body.Signers = &signers
+	}
 
 	meetingTime, _ := f.GetString("notary-meeting-time")
 	body.NotaryMeetingTime = parseDateFlag("notary-meeting-time", meetingTime, time.RFC3339)
 
 	if v := enumFlag(cmd, "auth-requirement", "sms", "none"); v != nil {
-		body.AuthenticationRequirement = utils.Ptr(business.TransactionCreateParamsAuthenticationRequirement(*v))
+		body.AuthenticationRequirement = utils.Ptr(business.TransactionParamsAuthenticationRequirement(*v))
 	}
 	if v := enumFlag(cmd, "idv-use-case", "STANDARD", "ACCOUNT_RECOVERY"); v != nil {
-		body.IdvUseCase = utils.Ptr(business.TransactionCreateParamsIdvUseCase(*v))
+		body.IdvUseCase = utils.Ptr(business.TransactionParamsIdvUseCase(*v))
 	}
 	if v := enumFlag(cmd, "payer", "signer", "sender"); v != nil {
-		body.Payer = utils.Ptr(business.TransactionCreateParamsPayer(*v))
+		body.Payer = utils.Ptr(business.TransactionParamsPayer(*v))
 	}
 
 	if notes, _ := f.GetStringSlice("notary-note"); len(notes) > 0 {
@@ -1155,6 +1234,76 @@ func applyTransactionParams(cmd *cobra.Command, body *business.TransactionCreate
 			body.Cosigner.SigningRequirement = utils.Ptr(business.CosignerSigningRequirement(*cosignerReq))
 		}
 	}
+
+	return body
+}
+
+// toCreateParams converts the shared body into the create endpoint's type.
+// TransactionCreateParams and TransactionParams are separate generated structs
+// with identical JSON tags for every field they share (they differ only in
+// `signer` being required and `documents` carrying uploads rather than an
+// ordering), so a marshal/unmarshal round-trip carries them all across without
+// 29 lines of hand-copying that a future spec change would silently outgrow.
+// TestBuildTransactionParams_SurvivesCreateConversion guards the fidelity.
+func toCreateParams(params business.TransactionParams) business.TransactionCreateParams {
+	raw, err := json.Marshal(params)
+	utils.HandleError(err, "building transaction request")
+
+	var create business.TransactionCreateParams
+	err = json.Unmarshal(raw, &create)
+	utils.HandleError(err, "building transaction request")
+	return create
+}
+
+// parseSignersFile reads --signers-file, a JSON array of signer objects that
+// becomes the transaction's `signers` list. The API requires an email on each
+// and caps the list at 10, both checked here so a bad file fails before the
+// request goes out.
+func parseSignersFile(cmd *cobra.Command) []business.Signers {
+	path, _ := cmd.Flags().GetString("signers-file")
+	if path == "" {
+		return nil
+	}
+
+	raw, err := os.ReadFile(path)
+	utils.HandleError(err, "reading signers file")
+
+	var signers []business.Signers
+	if err := json.Unmarshal(raw, &signers); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading signers file: %v\n", err)
+		fmt.Fprintln(os.Stderr, `Expected a JSON array, e.g. [{"email":"a@example.com","first_name":"Ada"}]`)
+		os.Exit(1)
+	}
+
+	if len(signers) > 10 {
+		fmt.Fprintf(os.Stderr, "Error: %s holds %d signers; the API allows at most 10\n", path, len(signers))
+		os.Exit(1)
+	}
+	for i, signer := range signers {
+		if signer.Email == nil || *signer.Email == "" {
+			fmt.Fprintf(os.Stderr, "Error: signer %d in %s has no email; every signer needs one\n", i, path)
+			os.Exit(1)
+		}
+	}
+	return signers
+}
+
+// parseDocumentOrder parses --document-order entries of the form "id=position",
+// e.g. "doc_abc123=1". Update and patch reorder documents already attached to
+// the transaction; use `documents add` to upload new ones.
+func parseDocumentOrder(cmd *cobra.Command) []business.BundleOrder {
+	raw, _ := cmd.Flags().GetStringSlice("document-order")
+	order := make([]business.BundleOrder, 0, len(raw))
+	for _, entry := range raw {
+		id, position, ok := strings.Cut(entry, "=")
+		n, err := strconv.Atoi(position)
+		if !ok || id == "" || err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid --document-order %q (want id=position, e.g. doc_abc123=1)\n", entry)
+			os.Exit(1)
+		}
+		order = append(order, business.BundleOrder{Id: utils.Ptr(id), BundlePosition: utils.Ptr(n)})
+	}
+	return order
 }
 
 // parseRecipientDetailsConfig parses --recipient-details-config entries of the
