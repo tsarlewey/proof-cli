@@ -37,8 +37,9 @@ jobs:
       - name: MCP server answers initialize inside the image
         run: |
           IMAGE=$(docker images ghcr.io/tsarlewey/proof-cli --format '{{.Repository}}:{{.Tag}}' | grep amd64 | head -1)
-          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
-            | timeout 10 docker run -i --rm "$IMAGE" | tee out.json
+          # Hold stdin open like a real client; the server exits 0 once it closes.
+          { echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}'; sleep 3; } \
+            | timeout 20 docker run -i --rm "$IMAGE" | tee out.json
           grep -q '"serverInfo"' out.json
       - name: server.json is valid
         run: |

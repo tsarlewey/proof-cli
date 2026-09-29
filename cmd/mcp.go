@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -64,7 +66,14 @@ Register with Claude Code:
 			}
 			server.AddTool(mcpTool(c), mcpHandler(self, c))
 		}
-		return server.Run(cmd.Context(), &mcp.StdioTransport{})
+		err = server.Run(cmd.Context(), &mcp.StdioTransport{})
+		// The SDK reports a client hanging up as "server is closing" (-32004),
+		// with the underlying io.EOF flattened to text. That's a normal exit.
+		var rpcErr *jsonrpc.Error
+		if errors.As(err, &rpcErr) && rpcErr.Code == -32004 {
+			return nil
+		}
+		return err
 	},
 }
 
