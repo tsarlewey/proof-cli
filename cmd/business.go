@@ -50,7 +50,7 @@ var bizListTransactionsCmd = &cobra.Command{
 		params := &business.GetAllTransactionsParams{
 			Limit:              utils.Ptr(limit),
 			Offset:             utils.Ptr(offset),
-			DocumentUrlVersion: utils.Ptr(business.GetAllTransactionsParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.GetAllTransactionsParamsDocumentUrlVersion("v2")),
 		}
 
 		// Parse status if provided
@@ -82,7 +82,7 @@ var bizGetTransactionCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &business.GetTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.GetTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.GetTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		// Make API call using SDK
@@ -121,7 +121,7 @@ var bizCreateTransactionCmd = &cobra.Command{
 
 		// Build query parameters
 		queryParams := &business.CreateTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.CreateTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.CreateTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		// Build request body
@@ -176,7 +176,7 @@ var bizActivateTransactionCmd = &cobra.Command{
 		requireVerification, _ := cmd.Flags().GetBool("require-new-signer-verification")
 
 		params := &business.ActivateDraftTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.ActivateDraftTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.ActivateDraftTransactionParamsDocumentUrlVersion("v2")),
 		}
 		body := business.ActivateDraftTransactionJSONRequestBody{
 			SuppressEmail:                &suppressEmail,
@@ -204,7 +204,7 @@ var bizRecallTransactionCmd = &cobra.Command{
 		recallReason, _ := cmd.Flags().GetString("reason")
 
 		params := &business.RecallTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.RecallTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.RecallTransactionParamsDocumentUrlVersion("v2")),
 		}
 		if recallReason != "" {
 			params.RecallReason = utils.Ptr(recallReason)
@@ -228,7 +228,7 @@ var bizCancelTransactionCmd = &cobra.Command{
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		params := &business.CancelTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.CancelTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.CancelTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		client := getBusinessClient()
@@ -251,7 +251,7 @@ var bizResendEmailCmd = &cobra.Command{
 		messageToSigner, _ := cmd.Flags().GetString("message")
 
 		params := &business.ResendTransactionEmailParams{
-			DocumentUrlVersion: utils.Ptr(business.ResendTransactionEmailParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.ResendTransactionEmailParamsDocumentUrlVersion("v2")),
 		}
 		if messageToSigner != "" {
 			params.MessageToSigner = utils.Ptr(messageToSigner)
@@ -330,7 +330,7 @@ change individual fields and leave the rest alone.`,
 		}
 
 		params := &business.UpdateDraftTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.UpdateDraftTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.UpdateDraftTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		client := getBusinessClient()
@@ -358,7 +358,7 @@ value. Use "update" to replace the whole transaction.`,
 		}
 
 		params := &business.PatchDraftTransactionParams{
-			DocumentUrlVersion: utils.Ptr(business.PatchDraftTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.PatchDraftTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		client := getBusinessClient()
@@ -413,7 +413,7 @@ var bizAddDocumentCmd = &cobra.Command{
 
 		// Build query parameters
 		queryParams := &business.AddDocumentParams{
-			DocumentUrlVersion: utils.Ptr(business.AddDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.AddDocumentParamsDocumentUrlVersion("v2")),
 		}
 
 		// Build request body
@@ -462,7 +462,7 @@ var bizGetDocumentCmd = &cobra.Command{
 		encoding, _ := cmd.Flags().GetString("encoding")
 
 		params := &business.GetDocumentParams{
-			DocumentUrlVersion: utils.Ptr(business.GetDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.GetDocumentParamsDocumentUrlVersion("v2")),
 		}
 		if encoding != "" {
 			params.Encoding = utils.Ptr(encoding)

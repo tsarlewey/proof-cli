@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.tsarlewey/proof-cli",
+  "title": "Proof CLI (unofficial)",
+  "description": "Notarize, e-sign, and verify identity with the Proof API. Unofficial; not affiliated with Proof.",
+  "repository": { "url": "https://github.com/tsarlewey/proof-cli", "source": "github" },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/tsarlewey/proof-cli:0.0.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "PROOF_API_KEY",
+          "description": "Proof API key (https://dev.proof.com/docs/api-keys)",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "PROOF_API_ENDPOINT",
+          "description": "API base URL. Defaults to production; use https://api.fairfax.proof.com for the sandbox.",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

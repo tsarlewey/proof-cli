@@ -45,7 +45,7 @@ var reListTransactionsCmd = &cobra.Command{
 		lastUpdatedDateEnd, _ := cmd.Flags().GetString("last-updated-date-end")
 
 		params := &realestate.GetAllMortgageTransactionsParams{
-			DocumentUrlVersion: utils.Ptr(realestate.GetAllMortgageTransactionsParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetAllMortgageTransactionsParamsDocumentUrlVersion("v2")),
 		}
 
 		if limit > 0 {
@@ -89,7 +89,7 @@ var reGetTransactionCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &realestate.GetMortgageTransactionParams{
-			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		// Make API call using SDK
@@ -115,7 +115,7 @@ var reCreateTransactionCmd = &cobra.Command{
 		loanNumber, _ := cmd.Flags().GetString("loan-number")
 
 		queryParams := &realestate.CreateMortgageTransactionParams{
-			DocumentUrlVersion: utils.Ptr(realestate.CreateMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.CreateMortgageTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		body := realestate.CreateMortgageTransactionJSONRequestBody{
@@ -153,7 +153,7 @@ var rePlaceOrderCmd = &cobra.Command{
 		requireVerification, _ := cmd.Flags().GetBool("require-new-signer-verification")
 
 		params := &realestate.PlaceOrderParams{
-			DocumentUrlVersion: utils.Ptr(realestate.PlaceOrderParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.PlaceOrderParamsDocumentUrlVersion("v2")),
 		}
 		body := realestate.PlaceOrderJSONRequestBody{
 			SuppressEmail:                &suppressEmail,
@@ -178,7 +178,7 @@ var reCancelTransactionCmd = &cobra.Command{
 	PreRun: initializeForAPICall,
 	Run: func(cmd *cobra.Command, args []string) {
 		params := &realestate.CancelMortgageTransactionParams{
-			DocumentUrlVersion: utils.Ptr(realestate.CancelMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.CancelMortgageTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		client := getRealEstateClient()
@@ -240,7 +240,7 @@ var reListDocumentsCmd = &cobra.Command{
 		transactionID := args[0]
 
 		params := &realestate.GetMortgageTransactionParams{
-			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		// Get transaction which includes documents
@@ -266,7 +266,7 @@ var reGetDocumentCmd = &cobra.Command{
 		encoding, _ := cmd.Flags().GetString("encoding")
 
 		params := &realestate.GetMortgageDocumentParams{
-			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.GetMortgageDocumentParamsDocumentUrlVersion("v2")),
 		}
 		if encoding != "" {
 			params.Encoding = utils.Ptr(realestate.GetMortgageDocumentParamsEncoding(encoding))
@@ -303,7 +303,7 @@ var reUploadDocumentCmd = &cobra.Command{
 		documentBase64 := base64.StdEncoding.EncodeToString(fileContent)
 
 		queryParams := &realestate.AddMortgageDocumentParams{
-			DocumentUrlVersion: utils.Ptr(realestate.AddMortgageDocumentParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(realestate.AddMortgageDocumentParamsDocumentUrlVersion("v2")),
 		}
 
 		body := realestate.AddMortgageDocumentJSONRequestBody{

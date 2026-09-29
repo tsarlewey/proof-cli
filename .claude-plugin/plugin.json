@@ -1,10 +1,17 @@
 {
   "name": "proof",
   "description": "Notarize, e-sign, and verify identity with the Proof API: a skill for the proof CLI plus its MCP server.",
-  "version": "0.3.0",
-  "author": { "name": "tsarlewey" },
+  "author": {
+    "name": "tsarlewey"
+  },
   "homepage": "https://github.com/tsarlewey/proof-cli",
   "repository": "https://github.com/tsarlewey/proof-cli",
   "license": "MIT",
-  "keywords": ["proof", "notarization", "e-signature", "identity-verification", "mcp"]
+  "keywords": [
+    "proof",
+    "notarization",
+    "e-signature",
+    "identity-verification",
+    "mcp"
+  ]
 }

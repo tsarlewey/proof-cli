@@ -29,7 +29,7 @@ var exampleListBusinessTransactionsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Build query parameters
 		limit := 10
-		docUrlVersion := business.GetAllTransactionsParamsDocumentUrlVersionV2
+		docUrlVersion := business.GetAllTransactionsParamsDocumentUrlVersion("v2")
 		params := &business.GetAllTransactionsParams{
 			Limit:              &limit,
 			DocumentUrlVersion: &docUrlVersion,

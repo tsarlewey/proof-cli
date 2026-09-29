@@ -49,6 +49,14 @@ claude mcp add proof -- proof mcp --read-only   # only tools that don't change a
 
 For other clients, run the command `proof mcp`. It reads credentials the same way as the CLI (`PROOF_API_KEY` or `proof config`).
 
+**Docker**, with nothing installed locally. The image runs `proof mcp` and is listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.tsarlewey/proof-cli`:
+
+```bash
+docker run -i --rm -e PROOF_API_KEY -e PROOF_API_ENDPOINT=https://api.fairfax.proof.com ghcr.io/tsarlewey/proof-cli
+```
+
+Arguments after the image name go to `proof mcp`, e.g. `--read-only`. `PROOF_API_ENDPOINT` overrides the configured endpoint in any mode; leave it unset for production.
+
 **Agents using the shell** can follow [skills/proof/SKILL.md](skills/proof/SKILL.md). Output is JSON (`--pretty=false` for compact), and API errors exit 1 with the response body on stderr. Point at the sandbox while testing: `proof config set-endpoint https://api.fairfax.proof.com`.
 
 ## Getting Started

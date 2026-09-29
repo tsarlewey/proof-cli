@@ -20,6 +20,11 @@ func NewProofClient() (*ProofClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
+	// Applied here rather than in LoadConfig so `config set-*` never persists it.
+	// Lets containers and CI target the sandbox without a config file.
+	if endpoint := os.Getenv("PROOF_API_ENDPOINT"); endpoint != "" {
+		config.APIEndpoint = endpoint
+	}
 
 	client := &ProofClient{
 		config: config,

@@ -15,7 +15,7 @@ proof config get                                                       # shows e
 ```
 
 - Auth: `PROOF_API_KEY` env var, or `proof config set-api-key <key>`. Never print, log, or commit the key. If none is set, ask the user; keys come from https://dev.proof.com/docs/api-keys.
-- Environment: production is `https://api.proof.com`; the sandbox is `https://api.fairfax.proof.com` (`proof config set-endpoint <url>`). **Use the sandbox for testing and anything exploratory.** Check `proof config get` before any write, and tell the user which environment you're hitting.
+- Environment: production is `https://api.proof.com`; the sandbox is `https://api.fairfax.proof.com` (`proof config set-endpoint <url>`, or `PROOF_API_ENDPOINT=<url>` for one command or session). **Use the sandbox for testing and anything exploratory.** Check `proof config get` before any write, and tell the user which environment you're hitting.
 - Add `--pretty=false` when you'll parse output (e.g. pipe to `jq`).
 
 ## Safety rules

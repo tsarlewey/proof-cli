@@ -897,3 +897,22 @@ func TestProofClient_TestOAuthAuthentication(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "test-token", loaded.AccessToken)
 }
+
+func TestNewProofClient_EndpointEnvOverride(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("PROOF_API_KEY", "k")
+
+	t.Setenv("PROOF_API_ENDPOINT", "")
+	client, err := NewProofClient()
+	require.NoError(t, err)
+	assert.Equal(t, "https://api.proof.com", client.GetConfig().APIEndpoint)
+
+	t.Setenv("PROOF_API_ENDPOINT", "https://api.fairfax.proof.com")
+	client, err = NewProofClient()
+	require.NoError(t, err)
+	assert.Equal(t, "https://api.fairfax.proof.com", client.GetConfig().APIEndpoint)
+
+	saved, err := LoadConfig()
+	require.NoError(t, err)
+	assert.Equal(t, "https://api.proof.com", saved.APIEndpoint, "override must not leak into the config file")
+}
