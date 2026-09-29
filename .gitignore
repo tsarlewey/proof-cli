@@ -4,8 +4,8 @@
 *.dll
 *.so
 *.dylib
-proof
-proof-cli
+/proof
+/proof-cli
 
 # Test binary, built with `go test -c`
 *.test
@@ -38,3 +38,5 @@ Thumbs.db
 
 # Claude Code local settings (per-developer permissions)
 .claude/settings.local.json
+# GoReleaser output
+dist/

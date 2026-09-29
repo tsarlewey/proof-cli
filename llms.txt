@@ -1,0 +1,15 @@
+# proof-cli
+
+> Unofficial command-line interface and MCP server for the Proof API (proof.com): remote online notarization, e-signature, identity verification, real-estate closings, SCIM provisioning, certificates, and verifiable credentials. Every command prints the API's JSON; errors exit 1.
+
+## Docs
+
+- [Agent usage guide (skill)](https://github.com/tsarlewey/proof-cli/blob/main/skills/proof/SKILL.md): setup, safety rules, core workflow, command map
+- [AGENTS.md](https://github.com/tsarlewey/proof-cli/blob/main/AGENTS.md): install, MCP, and plugin entry points
+- [README](https://github.com/tsarlewey/proof-cli/blob/main/README.md): full command reference with examples
+- [Releases](https://github.com/tsarlewey/proof-cli/releases): prebuilt binaries for macOS, Linux, and Windows
+
+## Related
+
+- [proof-sdk-go](https://github.com/tsarlewey/proof-sdk-go): the Go SDK this CLI is built on
+- [Proof API reference](https://dev.proof.com/reference)

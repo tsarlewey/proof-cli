@@ -6,6 +6,22 @@ An unofficial command-line interface for interacting with the Proof API. The Pro
 
 ## Installation
 
+### Prebuilt binary
+
+```bash
+# macOS / Linux: downloads the latest release for your OS and CPU into the current directory
+curl -sL "https://github.com/tsarlewey/proof-cli/releases/latest/download/proof_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz proof
+./proof version
+```
+
+Windows zips and checksums are on the [Releases](https://github.com/tsarlewey/proof-cli/releases) page.
+
+### Install via Go
+
+```bash
+go install github.com/tsarlewey/proof-cli@latest
+```
+
 ### From Source
 
 ```bash
@@ -15,11 +31,25 @@ go build -o proof
 ./proof --help
 ```
 
-### Install via Go
+## Use with AI agents
+
+**Claude Code plugin** (bundles a usage skill and the MCP server; needs `proof` on your `PATH`):
+
+```
+/plugin marketplace add tsarlewey/proof-cli
+/plugin install proof@proof
+```
+
+**MCP server** for any MCP client. `proof mcp` exposes every API command as a tool over stdio, annotated read-only or destructive:
 
 ```bash
-go install github.com/tsarlewey/proof-cli@latest
+claude mcp add proof -- proof mcp               # Claude Code
+claude mcp add proof -- proof mcp --read-only   # only tools that don't change anything
 ```
+
+For other clients, run the command `proof mcp`. It reads credentials the same way as the CLI (`PROOF_API_KEY` or `proof config`).
+
+**Agents using the shell** can follow [skills/proof/SKILL.md](skills/proof/SKILL.md). Output is JSON (`--pretty=false` for compact), and API errors exit 1 with the response body on stderr. Point at the sandbox while testing: `proof config set-endpoint https://api.fairfax.proof.com`.
 
 ## Getting Started
 

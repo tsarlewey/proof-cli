@@ -1,0 +1,14 @@
+{
+  "name": "proof",
+  "owner": {
+    "name": "tsarlewey"
+  },
+  "description": "Proof API tooling for AI agents: notarization, e-signature, and identity verification.",
+  "plugins": [
+    {
+      "name": "proof",
+      "source": "./",
+      "description": "Notarize, e-sign, and verify identity with the Proof API: a skill for the proof CLI plus its MCP server."
+    }
+  ]
+}
