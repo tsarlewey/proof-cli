@@ -34,7 +34,7 @@ func buildAuthorizeParams(cmd *cobra.Command) (*credentials.AuthorizeVerifiableC
 		ResponseType: "vp_token",
 		ResponseMode: credentials.AuthorizeVerifiableCredentialPresentationParamsResponseMode(responseMode),
 		Scope:        credentials.AuthorizeVerifiableCredentialPresentationParamsScope(scope),
-		LoginHint:    loginHint,
+		LoginHint:    utils.Ptr(loginHint),
 		Nonce:        nonce,
 	}
 	if state != "" {

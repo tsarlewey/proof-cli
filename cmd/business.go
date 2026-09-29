@@ -258,7 +258,7 @@ var bizResendSMSCmd = &cobra.Command{
 		phoneNumber, _ := cmd.Flags().GetString("phone-number")
 
 		params := &business.ResendTransactionSMSParams{
-			DocumentUrlVersion: utils.Ptr(business.ResendTransactionSMSParamsDocumentUrlVersionV2),
+			DocumentUrlVersion: utils.Ptr(business.ResendTransactionSMSParamsDocumentUrlVersion("v2")),
 		}
 		if phoneNumber != "" {
 			params.PhoneNumber = utils.Ptr(phoneNumber)
