@@ -60,6 +60,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/tsarlewey/proof-sdk-go v0.6.0 h1:jSVOQsNC0QnAsIfSBKfA5nEpIMeVTZMgZN5SPNWoetw=
 github.com/tsarlewey/proof-sdk-go v0.6.0/go.mod h1:aHy3bWIO9lagdnQwemQ2XxpcD+3BVRoEGfT1RU8wiqo=
+github.com/tsarlewey/proof-sdk-go v0.6.1 h1:RP25ET8exWgNcyq4+Sz7rm2VvlCKmnWQCrMTQCUUiMU=
+github.com/tsarlewey/proof-sdk-go v0.6.1/go.mod h1:aHy3bWIO9lagdnQwemQ2XxpcD+3BVRoEGfT1RU8wiqo=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 golang.org/x/oauth2 v0.34.0 h1:hqK/t4AKgbqWkdkcAeI8XLmbK+4m4G5YeQRrmiotGlw=

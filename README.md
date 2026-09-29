@@ -339,7 +339,7 @@ proof real-estate templates list
 
 ```bash
 # List documents
-proof real-estate documents list --transaction-id <transaction-id>
+proof real-estate documents list <transaction-id>
 
 # Get document details
 proof real-estate documents get <document-id>
