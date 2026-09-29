@@ -142,6 +142,9 @@ proof business transactions activate <transaction-id>
 
 # Delete a transaction
 proof business transactions delete <transaction-id>
+
+# Cancel a transaction
+proof business transactions cancel <transaction-id>
 ```
 
 #### Documents
@@ -152,6 +155,9 @@ proof business documents add <transaction-id> /path/to/document.pdf \
   --filename "Contract.pdf" \
   --requirement "esign" \
   --esign-required
+
+# Apply a specific template instead of automatic matching
+proof business documents add <transaction-id> /path/to/document.pdf --template-id <template-id>
 
 # Get a document
 proof business documents get <transaction-id> <document-id>
@@ -279,6 +285,16 @@ proof real-estate transactions create \
 
 # Place an order for a transaction
 proof real-estate transactions place-order <transaction-id>
+
+# Cancel a transaction
+proof real-estate transactions cancel <transaction-id>
+```
+
+#### Templates
+
+```bash
+# List templates
+proof real-estate templates list
 ```
 
 #### Documents

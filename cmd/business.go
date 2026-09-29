@@ -220,6 +220,26 @@ var bizRecallTransactionCmd = &cobra.Command{
 	},
 }
 
+var bizCancelTransactionCmd = &cobra.Command{
+	Use:    "cancel <transaction-id>",
+	Short:  "Cancel a transaction",
+	Long:   `Cancel a transaction`,
+	Args:   cobra.ExactArgs(1),
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		params := &business.CancelTransactionParams{
+			DocumentUrlVersion: utils.Ptr(business.CancelTransactionParamsDocumentUrlVersionV2),
+		}
+
+		client := getBusinessClient()
+		resp, err := client.CancelTransactionWithResponse(context.Background(), args[0], params)
+		utils.HandleError(err, "canceling transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "canceling transaction")
+
+		PrintResponse(resp.Body)
+	},
+}
+
 var bizResendEmailCmd = &cobra.Command{
 	Use:    "resend-email <transaction-id>",
 	Short:  "Resend transaction email",
@@ -382,6 +402,7 @@ var bizAddDocumentCmd = &cobra.Command{
 		pdfBookmarked, _ := cmd.Flags().GetBool("pdf-bookmarked")
 		trackingID, _ := cmd.Flags().GetString("tracking-id")
 		textTagSyntax, _ := cmd.Flags().GetString("text-tag-syntax")
+		templateID, _ := cmd.Flags().GetString("template-id")
 
 		// Read the file
 		fileContent, err := os.ReadFile(filePath)
@@ -409,6 +430,7 @@ var bizAddDocumentCmd = &cobra.Command{
 			PdfBookmarked:                utils.Ptr(pdfBookmarked),
 			TrackingId:                   utils.PtrIfNotEmpty(trackingID),
 			TextTagSyntax:                utils.PtrIfNotEmpty(textTagSyntax),
+			TemplateId:                   utils.PtrIfNotEmpty(templateID),
 			Requirement:                  utils.PtrIfNotEmpty(requirement),
 			AuthorizationHeader:          utils.PtrIfNotEmpty(authorizationHeader),
 		}
@@ -966,6 +988,7 @@ func init() {
 	bizActivateTransactionCmd.Flags().Bool("suppress-email", false, "Don't email the signer on activation (you must supply transaction_access_link yourself)")
 	bizActivateTransactionCmd.Flags().Bool("require-new-signer-verification", false, "Require the signer to verify email ownership")
 	bizTransactionsCmd.AddCommand(bizRecallTransactionCmd)
+	bizTransactionsCmd.AddCommand(bizCancelTransactionCmd)
 	bizTransactionsCmd.AddCommand(bizResendEmailCmd)
 	bizTransactionsCmd.AddCommand(bizResendSMSCmd)
 	bizTransactionsCmd.AddCommand(bizGetEligibleNotariesCmd)
@@ -1034,6 +1057,7 @@ func init() {
 	bizAddDocumentCmd.Flags().String("authorization-header", "", "Header for fetching doc URLs (format: header_name:header_value)")
 	bizAddDocumentCmd.Flags().Bool("pdf-bookmarked", false, "Whether document is bookmarked PDF (splits by bookmarks)")
 	bizAddDocumentCmd.Flags().String("text-tag-syntax", "", "Syntax used by text tags")
+	bizAddDocumentCmd.Flags().String("template-id", "", "Apply this template's designations instead of automatic matching (see: business templates list)")
 
 	bizGetDocumentCmd.Flags().String("encoding", "", "Can be 'base64' or 'uri'. 'uri' returns hosted URL (only after transaction completion)")
 

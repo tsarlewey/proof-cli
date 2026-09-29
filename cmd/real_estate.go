@@ -170,6 +170,59 @@ var rePlaceOrderCmd = &cobra.Command{
 	},
 }
 
+var reCancelTransactionCmd = &cobra.Command{
+	Use:    "cancel <transaction-id>",
+	Short:  "Cancel a real estate transaction",
+	Long:   `Cancel a real estate transaction`,
+	Args:   cobra.ExactArgs(1),
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		params := &realestate.CancelMortgageTransactionParams{
+			DocumentUrlVersion: utils.Ptr(realestate.CancelMortgageTransactionParamsDocumentUrlVersionV2),
+		}
+
+		client := getRealEstateClient()
+		resp, err := client.CancelMortgageTransactionWithResponse(context.Background(), args[0], params)
+		utils.HandleError(err, "canceling transaction")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "canceling transaction")
+
+		PrintResponse(resp.Body)
+	},
+}
+
+// Real Estate Templates Commands
+var reTemplatesCmd = &cobra.Command{
+	Use:   "templates",
+	Short: "Real estate template operations",
+	Long:  `Commands for managing real estate templates`,
+}
+
+var reListTemplatesCmd = &cobra.Command{
+	Use:    "list",
+	Short:  "List templates",
+	Long:   `List all real estate templates for your organization`,
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		limit, _ := cmd.Flags().GetInt("limit")
+		offset, _ := cmd.Flags().GetInt("offset")
+
+		params := &realestate.GetAllRealEstateTemplatesParams{}
+		if limit > 0 {
+			params.Limit = utils.Ptr(limit)
+		}
+		if offset > 0 {
+			params.Offset = utils.Ptr(offset)
+		}
+
+		client := getRealEstateClient()
+		resp, err := client.GetAllRealEstateTemplatesWithResponse(context.Background(), params)
+		utils.HandleError(err, "listing templates")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing templates")
+
+		PrintResponse(resp.Body)
+	},
+}
+
 // Real Estate Documents Commands
 var reDocumentsCmd = &cobra.Command{
 	Use:   "documents",
@@ -374,12 +427,17 @@ func init() {
 	realEstateCmd.AddCommand(reDocumentsCmd)
 	realEstateCmd.AddCommand(reWebhooksCmd)
 	realEstateCmd.AddCommand(reVerifyAddressCmd)
+	realEstateCmd.AddCommand(reTemplatesCmd)
+	reTemplatesCmd.AddCommand(reListTemplatesCmd)
+	reListTemplatesCmd.Flags().Int("limit", 0, "How many results to return (default: 100, max: 1000)")
+	reListTemplatesCmd.Flags().Int("offset", 0, "Number of results to skip for pagination")
 
 	// Transaction subcommands
 	reTransactionsCmd.AddCommand(reListTransactionsCmd)
 	reTransactionsCmd.AddCommand(reGetTransactionCmd)
 	reTransactionsCmd.AddCommand(reCreateTransactionCmd)
 	reTransactionsCmd.AddCommand(rePlaceOrderCmd)
+	reTransactionsCmd.AddCommand(reCancelTransactionCmd)
 	rePlaceOrderCmd.Flags().Bool("suppress-email", false, "Don't email the signer on order placement (you must supply transaction_access_link yourself)")
 	rePlaceOrderCmd.Flags().Bool("require-new-signer-verification", false, "Require the signer to verify email ownership")
 
