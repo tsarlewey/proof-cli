@@ -838,6 +838,39 @@ var bizListTemplatesCmd = &cobra.Command{
 	},
 }
 
+// Business Cost Center Commands
+var bizCostCentersCmd = &cobra.Command{
+	Use:   "cost-centers",
+	Short: "Business cost center operations",
+	Long:  `Commands for managing business cost centers`,
+}
+
+var bizListCostCentersCmd = &cobra.Command{
+	Use:    "list",
+	Short:  "List cost centers",
+	Long:   `List the cost centers transactions can be attributed to (see --cost-center-id)`,
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		limit, _ := cmd.Flags().GetInt("limit")
+		offset, _ := cmd.Flags().GetInt("offset")
+
+		params := &business.GetAllCostCentersParams{}
+		if limit > 0 {
+			params.Limit = utils.Ptr(limit)
+		}
+		if offset > 0 {
+			params.Offset = utils.Ptr(offset)
+		}
+
+		client := getBusinessClient()
+		resp, err := client.GetAllCostCentersWithResponse(context.Background(), params)
+		utils.HandleError(err, "listing cost centers")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing cost centers")
+
+		PrintResponse(resp.Body)
+	},
+}
+
 // Business Referrals Commands
 var bizReferralsCmd = &cobra.Command{
 	Use:   "referrals",
@@ -1017,6 +1050,12 @@ func init() {
 	// Template subcommands
 	bizTemplatesCmd.AddCommand(bizListTemplatesCmd)
 
+	// Cost center subcommands
+	businessCmd.AddCommand(bizCostCentersCmd)
+	bizCostCentersCmd.AddCommand(bizListCostCentersCmd)
+	bizListCostCentersCmd.Flags().Int("limit", 0, "How many results to return (default: 10, max: 1000)")
+	bizListCostCentersCmd.Flags().Int("offset", 0, "Number of results to skip for pagination")
+
 	// Referral subcommands
 	bizReferralsCmd.AddCommand(bizCreateReferralCmd)
 	bizReferralsCmd.AddCommand(bizGenerateReferralCodeCmd)
@@ -1129,6 +1168,7 @@ func registerTransactionParamFlags(cmd *cobra.Command) {
 	f.String("expiry", "", "ISO-8601 datetime after which transaction expires")
 	f.String("external-id", "", "External system ID")
 	f.String("config-id", "", "Transaction configuration ID")
+	f.String("cost-center-id", "", "Cost center to attribute the transaction to (see: business cost-centers list)")
 	f.String("organization-id", "", "Act on behalf of a child organization")
 	f.String("payer", "", "Who pays for the transaction (signer or sender)")
 	f.Bool("pdf-bookmarked", false, "Split the uploaded PDF into documents by its bookmarks")
@@ -1189,6 +1229,7 @@ func buildTransactionParams(cmd *cobra.Command) business.TransactionParams {
 		Expiry:           str("expiry"),
 		ExternalId:       str("external-id"),
 		ConfigId:         str("config-id"),
+		CostCenterId:     str("cost-center-id"),
 		OrganizationId:   str("organization-id"),
 		NotaryId:         str("notary-id"),
 		MessageSubject:   str("message-subject"),

@@ -269,6 +269,14 @@ proof business templates list
 proof business templates list --limit 50 --offset 100
 ```
 
+#### Cost Centers
+
+```bash
+# List cost centers, then attribute a transaction with --cost-center-id
+proof business cost-centers list
+proof business transactions create --email a@b.com --cost-center-id <id>
+```
+
 #### Referrals
 
 ```bash
@@ -333,6 +341,13 @@ proof real-estate transactions cancel <transaction-id>
 ```bash
 # List templates
 proof real-estate templates list
+```
+
+#### Cost Centers
+
+```bash
+proof real-estate cost-centers list
+proof real-estate transactions create --cost-center-id <id>
 ```
 
 #### Documents

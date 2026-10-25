@@ -20,7 +20,7 @@ var allTransactionFlags = []string{
 	"--phone-number", "+15555550123",
 	"--name", "Series A", "--type", "esign",
 	"--activation-time", "2026-09-01T10:00:00Z", "--expiry", "2026-09-08T10:00:00Z",
-	"--external-id", "ext-42", "--config-id", "cfg-1", "--organization-id", "org-9",
+	"--external-id", "ext-42", "--config-id", "cfg-1", "--cost-center-id", "cc-3", "--organization-id", "org-9",
 	"--payer", "sender", "--pdf-bookmarked",
 	"--auth-requirement", "sms", "--idv-use-case", "ACCOUNT_RECOVERY",
 	"--require-secondary-photo-id", "--require-new-signer-verification",
@@ -67,6 +67,7 @@ func TestBuildTransactionParams_WiresEveryFlag(t *testing.T) {
 	assert.Equal(t, "2026-09-08T10:00:00Z", *body.Expiry)
 	assert.Equal(t, "ext-42", *body.ExternalId)
 	assert.Equal(t, "cfg-1", *body.ConfigId)
+	assert.Equal(t, "cc-3", *body.CostCenterId)
 	assert.Equal(t, "org-9", *body.OrganizationId)
 	assert.Equal(t, business.TransactionParamsPayer("sender"), *body.Payer)
 	assert.True(t, *body.PdfBookmarked)

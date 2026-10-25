@@ -113,15 +113,17 @@ var reCreateTransactionCmd = &cobra.Command{
 		draft, _ := cmd.Flags().GetBool("draft")
 		fileNumber, _ := cmd.Flags().GetString("file-number")
 		loanNumber, _ := cmd.Flags().GetString("loan-number")
+		costCenterID, _ := cmd.Flags().GetString("cost-center-id")
 
 		queryParams := &realestate.CreateMortgageTransactionParams{
 			DocumentUrlVersion: utils.Ptr(realestate.CreateMortgageTransactionParamsDocumentUrlVersion("v2")),
 		}
 
 		body := realestate.CreateMortgageTransactionJSONRequestBody{
-			Draft:      utils.Ptr(draft),
-			FileNumber: utils.PtrIfNotEmpty(fileNumber),
-			LoanNumber: utils.PtrIfNotEmpty(loanNumber),
+			Draft:        utils.Ptr(draft),
+			FileNumber:   utils.PtrIfNotEmpty(fileNumber),
+			LoanNumber:   utils.PtrIfNotEmpty(loanNumber),
+			CostCenterId: utils.PtrIfNotEmpty(costCenterID),
 		}
 
 		// Set transaction type if provided
@@ -218,6 +220,39 @@ var reListTemplatesCmd = &cobra.Command{
 		resp, err := client.GetAllRealEstateTemplatesWithResponse(context.Background(), params)
 		utils.HandleError(err, "listing templates")
 		checkAPIStatus(resp.StatusCode(), resp.Body, "listing templates")
+
+		PrintResponse(resp.Body)
+	},
+}
+
+// Real Estate Cost Center Commands
+var reCostCentersCmd = &cobra.Command{
+	Use:   "cost-centers",
+	Short: "Real estate cost center operations",
+	Long:  `Commands for managing real estate cost centers`,
+}
+
+var reListCostCentersCmd = &cobra.Command{
+	Use:    "list",
+	Short:  "List cost centers",
+	Long:   `List the cost centers transactions can be attributed to (see --cost-center-id)`,
+	PreRun: initializeForAPICall,
+	Run: func(cmd *cobra.Command, args []string) {
+		limit, _ := cmd.Flags().GetInt("limit")
+		offset, _ := cmd.Flags().GetInt("offset")
+
+		params := &realestate.GetAllRealEstateCostCentersParams{}
+		if limit > 0 {
+			params.Limit = utils.Ptr(limit)
+		}
+		if offset > 0 {
+			params.Offset = utils.Ptr(offset)
+		}
+
+		client := getRealEstateClient()
+		resp, err := client.GetAllRealEstateCostCentersWithResponse(context.Background(), params)
+		utils.HandleError(err, "listing cost centers")
+		checkAPIStatus(resp.StatusCode(), resp.Body, "listing cost centers")
 
 		PrintResponse(resp.Body)
 	},
@@ -431,6 +466,10 @@ func init() {
 	reTemplatesCmd.AddCommand(reListTemplatesCmd)
 	reListTemplatesCmd.Flags().Int("limit", 0, "How many results to return (default: 100, max: 1000)")
 	reListTemplatesCmd.Flags().Int("offset", 0, "Number of results to skip for pagination")
+	realEstateCmd.AddCommand(reCostCentersCmd)
+	reCostCentersCmd.AddCommand(reListCostCentersCmd)
+	reListCostCentersCmd.Flags().Int("limit", 0, "How many results to return (default: 10, max: 1000)")
+	reListCostCentersCmd.Flags().Int("offset", 0, "Number of results to skip for pagination")
 
 	// Transaction subcommands
 	reTransactionsCmd.AddCommand(reListTransactionsCmd)
@@ -466,6 +505,7 @@ func init() {
 	reCreateTransactionCmd.Flags().Bool("draft", true, "Create as draft")
 	reCreateTransactionCmd.Flags().String("file-number", "", "File number")
 	reCreateTransactionCmd.Flags().String("loan-number", "", "Loan number")
+	reCreateTransactionCmd.Flags().String("cost-center-id", "", "Cost center to attribute the transaction to (see: real-estate cost-centers list)")
 
 	// Add flags for documents
 	reGetDocumentCmd.Flags().String("encoding", "", "Encoding format (base64 or uri)")
